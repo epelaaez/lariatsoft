@@ -60,7 +60,7 @@ outputs:
  {
    module_type: RootOutput
    SelectEvents: [reco]
-   fileName:    "%ifb_Pion_Absorption_Signal.root"
+   fileName:    "Pion_Absorption_Signal.root"
    dataTier:    "reconstructed-2d"
    compressionLevel: 1
  }
