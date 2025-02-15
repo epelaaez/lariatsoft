@@ -259,7 +259,8 @@ bool SignalPionAbsorption::filter(art::Event & e)
   if (bCaptureAtRest) return false; 
 
   // Condition for inelastic absorption; after this conditional statement, all non-absorption events have been rejected
-  if ((nProtonsPiInelastic + nNeutronsPiInelastic) < 1) return false;
+  // EDIT: we accept events with 0 protons coming out, as we reject capture at rest above
+  // if ((nProtonsPiInelastic + nNeutronsPiInelastic) < ) return false;
 
   // Set variables of interest
   iNumNucleons = nProtonsPiInelastic + nNeutronsPiInelastic;
