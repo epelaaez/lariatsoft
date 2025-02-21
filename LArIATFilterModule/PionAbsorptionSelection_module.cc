@@ -17,8 +17,129 @@
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/AnalysisBase/BackTrackerMatchingData.h"
 
+// #######################
+// ### LArIAT includes ###
+// #######################
+#include "Utilities/DatabaseUtilityT1034.h"
+#include "LArIATRecoAlg/TriggerFilterAlg.h"
+#include "LArIATDataProducts/WCTrack.h"
+
+// ##########################
+// ### Framework includes ###
+// ##########################
+#include "canvas/Utilities/InputTag.h"
+#include "art/Framework/Core/EDAnalyzer.h"
+#include "canvas/Persistency/Common/FindManyP.h"
+#include "canvas/Persistency/Common/FindOneP.h" 
+#include "art/Framework/Core/ModuleMacros.h"
+#include "art/Framework/Principal/Event.h"
+#include "art/Framework/Principal/Handle.h"
+#include "art/Framework/Principal/Run.h"
+#include "art/Framework/Principal/SubRun.h"
+//#include "art/Framework/Services/Optional/TFileService.h" 
+//#include "art/Framework/Services/Optional/TFileDirectory.h"
+#include "art_root_io/TFileService.h"
+#include "art_root_io/TFileDirectory.h"
+#include "art/Framework/Services/Registry/ServiceHandle.h" 
+#include "canvas/Persistency/Common/Ptr.h" 
+#include "canvas/Persistency/Common/PtrVector.h" 
+#include "canvas/Utilities/InputTag.h"
+#include "messagefacility/MessageLogger/MessageLogger.h"
+#include "cetlib/maybe_ref.h"
+#include "fhiclcpp/ParameterSet.h" 
+
+// ########################
+// ### LArSoft includes ###
+// ########################
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
 #include "larcoreobj/SimpleTypesAndConstants/RawTypes.h" 
+#include "larcore/Geometry/Geometry.h"
+#include "larcorealg/Geometry/CryostatGeo.h"
+#include "larcorealg/Geometry/TPCGeo.h"
+#include "larcorealg/Geometry/PlaneGeo.h"
+#include "larcorealg/Geometry/WireGeo.h"
+#include "lardataobj/RecoBase/Wire.h"
+#include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/Cluster.h"
+#include "lardataobj/RecoBase/Track.h"
+#include "lardataobj/RecoBase/Vertex.h"
+#include "lardataobj/RecoBase/SpacePoint.h"
+#include "lardata/DetectorInfoServices/LArPropertiesService.h"
+#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
+#include "lardata/Utilities/AssociationUtil.h"
+#include "lardataobj/RawData/ExternalTrigger.h"
+#include "lardataobj/RawData/RawDigit.h"
+#include "lardataobj/RawData/raw.h"
+#include "larsim/MCCheater/BackTracker.h"
+#include "lardataobj/Simulation/SimChannel.h"
+#include "larevt/Filters/ChannelFilter.h"
+#include "lardataobj/AnalysisBase/Calorimetry.h"
+#include "lardataobj/AnalysisBase/ParticleID.h"
+#include "larreco/RecoAlg/TrackMomentumCalculator.h"
+#include "LArIATDataProducts/WCTrack.h"
+#include "RawDataUtilities/TriggerDigitUtility.h"
+
+#include "art/Framework/Core/EDFilter.h"
+#include "art/Framework/Core/ModuleMacros.h"
+#include "art/Framework/Principal/Event.h"
+#include "art/Framework/Principal/Handle.h"
+#include "art/Framework/Principal/Run.h"
+#include "art/Framework/Principal/SubRun.h"
+#include "LArIATDataProducts/WCTrack.h"
+#include "canvas/Persistency/Common/FindOneP.h" 
+#include "canvas/Persistency/Common/Ptr.h" 
+#include "canvas/Persistency/Common/PtrVector.h"
+#include "cetlib/maybe_ref.h" 
+//#include "art/Utilities/InputTag.h"
+#include "fhiclcpp/ParameterSet.h"
+#include "messagefacility/MessageLogger/MessageLogger.h"
+#include "lardataobj/RecoBase/Track.h"
+#include <memory>
+#include "lardataobj/RecoBase/PFParticle.h"
+#include "larsim/MCCheater/ParticleInventoryService.h"
+
+
+// #####################
+// ### ROOT includes ###
+// #####################
+#include <TH1F.h>
+#include <TF1.h>
+#include <TH2F.h>
+#include <TGraph.h>
+#include <TTree.h>
+
+// ####################
+// ### C++ includes ###
+// ####################
+#include <map>
+#include <memory>
+#include <fstream>
+#include "math.h"
+#include <algorithm>
+
+// ##########################
+// ### Framework includes ###
+// ##########################
+#include "art/Framework/Core/EDAnalyzer.h"
+#include "art/Framework/Core/ModuleMacros.h" 
+#include "art/Framework/Principal/Event.h" 
+#include "fhiclcpp/ParameterSet.h" 
+#include "art/Framework/Principal/Run.h"
+#include "art/Framework/Principal/SubRun.h"
+#include "art/Framework/Principal/Handle.h" 
+#include "canvas/Persistency/Common/Ptr.h" 
+#include "canvas/Persistency/Common/PtrVector.h" 
+#include "art/Framework/Services/Registry/ServiceHandle.h" 
+#include "canvas/Persistency/Common/FindOneP.h" 
+#include "canvas/Persistency/Common/FindManyP.h"
+#include "messagefacility/MessageLogger/MessageLogger.h" 
+//#include "cetlib/maybe_ref.h"
+
+// ########################
+// ### LArSoft includes ###
+// ########################
+#include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
+#include "larcoreobj/SimpleTypesAndConstants/RawTypes.h" // raw::ChannelID_t
 #include "larcore/Geometry/Geometry.h"
 #include "larcorealg/Geometry/CryostatGeo.h"
 #include "larcorealg/Geometry/TPCGeo.h"
@@ -35,82 +156,40 @@
 #include "lardata/DetectorInfoServices/LArPropertiesService.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/Utilities/AssociationUtil.h"
-#include "lardataobj/RawData/ExternalTrigger.h"
+
+//#include "RawData/ExternalTrigger.h"
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RawData/raw.h"
-#include "larsim/MCCheater/BackTracker.h"
+#include "larsim/MCCheater/BackTrackerService.h"
+#include "larsim/MCCheater/ParticleInventoryService.h"
 #include "lardataobj/Simulation/SimChannel.h"
+#include "nusimdata/SimulationBase/MCTruth.h"
 #include "larevt/Filters/ChannelFilter.h"
 #include "lardataobj/AnalysisBase/Calorimetry.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
 #include "larreco/RecoAlg/TrackMomentumCalculator.h"
-#include "RawDataUtilities/TriggerDigitUtility.h"
-
-// #######################
-// ### LArIAT includes ###
-// #######################
-#include "Utilities/DatabaseUtilityT1034.h"
-#include "LArIATRecoAlg/TriggerFilterAlg.h"
 #include "LArIATDataProducts/WCTrack.h"
-
-// ##########################
-// ### Framework includes ###
-// ##########################
-#include "art/Framework/Core/EDFilter.h"
-#include "canvas/Utilities/InputTag.h"
-#include "art/Framework/Core/EDAnalyzer.h"
-#include "canvas/Persistency/Common/FindManyP.h"
-#include "canvas/Persistency/Common/FindOneP.h" 
-#include "art/Framework/Principal/Event.h"
-#include "art/Framework/Principal/Handle.h"
-#include "art/Framework/Principal/Run.h"
-#include "art/Framework/Principal/SubRun.h"
-#include "art_root_io/TFileService.h"
-#include "art_root_io/TFileDirectory.h"
-#include "art/Framework/Services/Registry/ServiceHandle.h" 
-#include "canvas/Persistency/Common/Ptr.h" 
-#include "canvas/Persistency/Common/PtrVector.h" 
-#include "canvas/Utilities/InputTag.h"
-#include "messagefacility/MessageLogger/MessageLogger.h"
-#include "cetlib/maybe_ref.h"
-#include "fhiclcpp/ParameterSet.h" 
-#include "art/Framework/Core/ModuleMacros.h"
-
-#include "lardataobj/RecoBase/PFParticle.h"
-#include "larsim/MCCheater/BackTrackerService.h"
-#include "larsim/MCCheater/ParticleInventoryService.h"
-#include "nusimdata/SimulationBase/MCTruth.h"
-#include "lardataobj/AnalysisBase/ParticleID.h"
-#include "larreco/RecoAlg/TrackMomentumCalculator.h"
 #include "LArIATDataProducts/TOF.h"
 #include "LArIATDataProducts/AGCounter.h"
+#include "RawDataUtilities/TriggerDigitUtility.h"
 #include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/RecoBase/EndPoint2D.h"
 #include "lardataobj/MCBase/MCShower.h"
 #include "lardataobj/MCBase/MCStep.h"
 #include "larreco/Calorimetry/CalorimetryAlg.h"
-#include "LArIATRecoAlg/BeamlineMassAlg.h"
-
-// ####################
-// ### C++ includes ###
-// ####################
-#include <map>
-#include <memory>
-#include "math.h"
-#include <algorithm>
 
 // #####################
 // ### ROOT includes ###
 // #####################
-#include "TH1F.h"
-#include "TH2F.h"
-#include "TGraph.h"
 #include "TComplex.h"
 #include "TFile.h"
 #include "TH2D.h"
 #include "TF1.h"
 #include "TTree.h"
 #include "TTimeStamp.h"
+
+// Type definitions
+typedef std::map<int, art::Ptr<simb::MCParticle>> ParticleMap;
 
 class PionAbsorptionSelection : public art::EDFilter {
     public:
@@ -141,6 +220,8 @@ class PionAbsorptionSelection : public art::EDFilter {
         std::string strTPCTrackHandleLabel;
         std::string strWC2TPCModuleLabel;
         std::string strCalorimetryModuleLabel;
+        std::string simulation_producer_label_;
+        std::string recotrackmcparticlematching_label_;
 
         // fcl parameters
         bool bVerbose;
@@ -184,6 +265,12 @@ class PionAbsorptionSelection : public art::EDFilter {
         double WCPhi;
         bool isPionReversed = false;
 
+        // Pion truth information
+        int pionTruthPDG; 
+        std::string pionTruthProcess = "";
+        std::vector<int> pionDaughtersPDG;
+        std::vector<std::string> pionDaughtersProcess;
+
         // Proton tracks
         int protonCount = 0;
         std::vector<double> protonBeginX;
@@ -196,6 +283,7 @@ class PionAbsorptionSelection : public art::EDFilter {
         std::vector<double> protonLength;
         std::vector<bool>   isProtonInverted;
         std::vector<bool>   isProtonStopping;
+        std::vector<std::string> protonTrueProcess;
 
         // Masses
         const double PionMass    = .13957018;    // in GeV
@@ -324,6 +412,25 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     // Define calorimetry
     art::FindManyP<anab::Calorimetry> fmcal(tpcTrackHandle, e, strCalorimetryModuleLabel);
 
+    // Get simulated particles
+    auto particle_handle = e.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
+    std::vector<art::Ptr<simb::MCParticle>> particle_vector;
+    art::fill_ptr_vector(particle_vector, particle_handle);
+
+    // Get particle list
+    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    const sim::ParticleList& plist = pi_serv->ParticleList();
+
+    // Initialize particle map and fill it
+    ParticleMap particle_map; 
+    for (auto const& particle : particle_vector) {
+        particle_map[particle->TrackId()] = particle;
+    }
+
+    // Get MCParticles from tracks
+    const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
+        find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
+
     //////////////////////
     // Selection algorithm
     //////////////////////
@@ -368,11 +475,35 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
                         return false;
                     }
                 }
+
+                // If we accept this pion, we want information about its process
+                std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trk_idx);
+                std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
+                
+                auto const& particle = particles.front();
+                pionTruthPDG = particle->PdgCode();
+                pionTruthProcess = particle->Process();
+                
+                // Get daughters IDs
+                std::vector<int> daughterIDs;
+                for (int i = 0; i < particle->NumberDaughters(); ++i) daughterIDs.push_back(particle->Daughter(i));
+
+                for (size_t p = 0; p < plist.size(); ++p) {
+                    auto part = plist.Particle(p);
+                    if (std::find(daughterIDs.begin(), daughterIDs.end(), part->TrackId()) != daughterIDs.end()) {
+                        pionDaughtersProcess.push_back(part->Process());
+                        pionDaughtersPDG.push_back(part->PdgCode());
+                    }
+                }
             }
         }
     } // end of WC2TPCtrkID if statement
+    else {
+        // if no match
+        return false;
+    }
 
-    // If we made it here, pion vertex is inside fiducial volume
+    // If we made it here, pion vertex is inside reduced volume
     pionVertexInRedVolEventCount++;
 
     // Now we want to look at near pion
@@ -415,6 +546,17 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
                 // TODO: do something different btw stopping and non-stopping protons?
                 return false;
             }
+
+            // If we will accept this proton, we want truth information about its
+            // mother particle and the process that generated the particle
+            std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trk_idx);
+            std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
+
+            std::string protonProcess = "";
+            if (btdata_vector.size() > 0) {
+                auto const& particle = particles.front();
+                protonProcess = particle->Process();
+            }
             
             protonCount++;
             protonBeginX.push_back(recoBeginning.X());
@@ -427,6 +569,8 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
             protonLength.push_back(thisTrack->Length());
             isProtonInverted.push_back(isThisTrackReversed);
             isProtonStopping.push_back(isThisTrackStopping);
+
+            protonTrueProcess.push_back(protonProcess);
 
             if (bVerbose) std::cout << "Found proton track near pion with DEDX: " << thisMeanDEDX << std::endl;
             if (bVerbose) std::cout << std::endl;
@@ -450,8 +594,10 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     strTPCTrackHandleLabel             = p.get<std::string>("TPCTrackHandleLabel", "pmtrack");
     strWC2TPCModuleLabel               = p.get<std::string>("WC2TPModuleLabel", "wctracktpctrackmatch");
     strCalorimetryModuleLabel          = p.get<std::string>("CalorimetryModuleLabel", "calo");
-    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 60);
+    simulation_producer_label_         = p.get<std::string>("SimulationLabel", "largeant");
+    recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
 
+    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 60);
     fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 3.4);
     fVertexRadius                      = p.get<double>("VertexRadius", 4);
 }
@@ -466,6 +612,12 @@ void PionAbsorptionSelection::beginJob() {
     PionAbsTree->Branch("Run", &run, "run/I");
     PionAbsTree->Branch("Subrun", &subrun, "subrun/I");
     PionAbsTree->Branch("Event", &event, "event/I");
+
+    PionAbsTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
+    PionAbsTree->Branch("pionTruthPDG", &pionTruthPDG, "pionTruthPDG/I");
+    PionAbsTree->Branch("pionTruthProcess", "std::string", &pionTruthProcess);
+    PionAbsTree->Branch("pionDaughtersPDG", "std::vector<int>", &pionDaughtersPDG);
+    PionAbsTree->Branch("pionDaughtersProcess", "std::vector<std::string>", &pionDaughtersProcess);
 
     PionAbsTree->Branch("totalEventCount", &totalEventCount, "totalEventCount/I");
     PionAbsTree->Branch("pionVertexInRedVolEventCount", &pionVertexInRedVolEventCount, "pionVertexInRedVolEventCount/I");
@@ -492,6 +644,7 @@ void PionAbsorptionSelection::beginJob() {
     PionAbsTree->Branch("protonLength", "std::vector<double>", &protonLength);
     PionAbsTree->Branch("isProtonInverted", "std::vector<bool>", &isProtonInverted);
     PionAbsTree->Branch("isProtonStopping", "std::vector<bool>", &isProtonStopping);
+    PionAbsTree->Branch("protonTrueProcess", "std::vector<std::string>", &protonTrueProcess);
 }
 
 void PionAbsorptionSelection::endJob() {
@@ -504,6 +657,10 @@ void PionAbsorptionSelection::endJob() {
 void PionAbsorptionSelection::resetTree() {
     WC2TPCtrkID = -99999;
     isPionReversed = false;
+    pionTruthPDG = -99999;
+    pionTruthProcess = "";
+    pionDaughtersPDG.clear();
+    pionDaughtersProcess.clear();
 
     protonCount = 0;
     protonBeginX.clear();
@@ -516,6 +673,7 @@ void PionAbsorptionSelection::resetTree() {
     protonLength.clear();
     isProtonInverted.clear();
     isProtonStopping.clear();
+    protonTrueProcess.clear();
 }
 
 double PionAbsorptionSelection::meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed) {

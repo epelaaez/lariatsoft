@@ -54,7 +54,7 @@ public:
   void reconfigure(fhicl::ParameterSet const & p);
 
   // Helpers 
-  bool isInFiducialVolume(simb::MCParticle *track); 
+  bool isInReducedVolume(simb::MCParticle *track); 
   int lastPointInTPC(simb::MCParticle *track);
   int firstPointInTPC(simb::MCParticle *track);
   double trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2);
@@ -158,7 +158,7 @@ bool SignalPionAbsorption::filter(art::Event & e)
     // Check primary particle is negative pion
     if (mcPart->Process() == "primary" && mcPart->PdgCode() == -211) {
       // Check that interaction vertex is in fiducial volume
-      if (!isInFiducialVolume(mcPart)) continue;
+      if (!isInReducedVolume(mcPart)) continue;
       
       isPrimaryPartPion = true;
 
@@ -256,7 +256,7 @@ bool SignalPionAbsorption::filter(art::Event & e)
     }
   }
   // Reject capture at rest
-  if (bCaptureAtRest) return false; 
+  if (bCaptureAtRest) return false;
 
   // Condition for inelastic absorption; after this conditional statement, all non-absorption events have been rejected
   // EDIT: we accept events with 0 protons coming out, as we reject capture at rest above
@@ -286,7 +286,7 @@ bool SignalPionAbsorption::filter(art::Event & e)
   return true;
 }
 
-bool SignalPionAbsorption::isInFiducialVolume(simb::MCParticle *track) {
+bool SignalPionAbsorption::isInReducedVolume(simb::MCParticle *track) {
   return (
     (track->EndX()>RminX) && (track->EndX()<RmaxX) && 
     (track->EndY()>RminY) && (track->EndY()<RmaxY) && 

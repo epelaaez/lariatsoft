@@ -1,4 +1,5 @@
 #include "services_lariat.fcl"
+#include "recomcparticlematching.fcl"
  
 process_name: PionAbsorptionSelection
 
@@ -14,17 +15,16 @@ services.scheduler.SkipEvent: [ ProductNotFound ]
 
 source: {
     module_type: RootInput
-    maxEvents:  -1        # Number of events to create
+    maxEvents: -1
 }
-
 
 # Define and configure some modules to do work on each event.
 # First modules are defined; they are scheduled later.
 # Modules are grouped by type.
 physics: {
-    # producers: {
-    #   recotrackmcmatching: @local::standard_recomcparticlematching
-    # }
+    producers: {
+        recotrackmcmatching: @local::standard_recomcparticlematching
+    }
     
     filters: {
         PionAbsorptionSelection: {
@@ -34,13 +34,14 @@ physics: {
             TPCTrackHandleLabel:    pmtrack
             WC2TPModuleLabel:       wctracktpctrackmatch
             CalorimetryModuleLabel: calo
+            SimulationLabel:        largeant 
+            RecoTrackMCMatchLabel:  recotrackmcmatching
             MeanDEDXThreshold:      3.4
             VertexRadius:           4
         }
     }
     
-    reco: [ PionAbsorptionSelection ]
-    
+    reco: [ recotrackmcmatching, PionAbsorptionSelection ]
     ana: []
 
     #define the output stream, there could be more than one if using filters 
@@ -69,7 +70,7 @@ outputs:
     }
 }
 
-#physics.producers.recotrackmcmatching.match_tracks:  true
-#physics.producers.recotrackmcmatching.match_showers: false
-#physics.producers.recotrackmcmatching.cluster_label: "trajcluster"
-#physics.producers.recotrackmcmatching.track_label:   "pmtrack"
+physics.producers.recotrackmcmatching.match_tracks:  true
+physics.producers.recotrackmcmatching.match_showers: false
+physics.producers.recotrackmcmatching.cluster_label: "trajcluster"
+physics.producers.recotrackmcmatching.track_label:   "pmtrack"

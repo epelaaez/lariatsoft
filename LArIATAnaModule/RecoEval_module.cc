@@ -266,6 +266,7 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> truthProtonsInitialPx;
         std::vector<double> truthProtonsInitialPy;
         std::vector<double> truthProtonsInitialPz;
+        std::vector<double> truthProtonsLength;
 
         // WC variables
         int WC2TPCtrkID;
@@ -378,7 +379,7 @@ void RecoEval::analyze(art::Event const &e) {
     art::fill_ptr_vector(wctrack, wctrackHandle);
 
     int numWCtrks = wctrack.size(); // number of wire chamber tracks
-    if (numWCtrks != 1) return; // TODO: needed?
+    if (numWCtrks != 1) return; 
 
     // Get wcTrack momentum
     WCTrackMomentum = wctrack[0]->Momentum() * 0.001; // Mev to GeV
@@ -615,6 +616,14 @@ void RecoEval::analyze(art::Event const &e) {
             if (((pdg_code == -211) || (pdg_code == 2212)) && (particleSpeciesIndex == 2)) continue;
 
             // Get cleanliness/completeness of track from metadata
+            if (bVerbose) std::cout << "Cleanliness * completeness of matched tracks:" << std::endl;
+            for (unsigned int i = 0; i < btdata_vector.size(); ++i) {
+                double this_cleanliness = btdata_vector[i]->cleanliness;
+                double this_completeness = btdata_vector[i]->completeness;
+                if (bVerbose) std::cout << this_cleanliness * this_completeness << std::endl;
+            }
+            if (bVerbose) std::cout << std::endl;
+
             double const cleanliness  = btdata_vector.front()->cleanliness;
             double const completeness = btdata_vector.front()->completeness;
 
@@ -803,6 +812,7 @@ void RecoEval::analyze(art::Event const &e) {
             meanDEDX /= (recoDEDX_v.size() - bound);
             recoMeanDEDX.push_back(meanDEDX);
             if (bVerbose) std::cout << "Mean DEDX for track: " << meanDEDX << std::endl;
+            if (bVerbose) std::cout << std::endl;
 
             // Clear inner vectors
             recoPitch_v.clear();
@@ -863,6 +873,7 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("truthProtonsInitialPx", "std::vector<double>", &truthProtonsInitialPx);
     RecoEvalTree->Branch("truthProtonsInitialPy", "std::vector<double>", &truthProtonsInitialPy);
     RecoEvalTree->Branch("truthProtonsInitialPz", "std::vector<double>", &truthProtonsInitialPz);
+    RecoEvalTree->Branch("truthProtonsLength", "std::vector<double>", &truthProtonsLength);
 
     RecoEvalTree->Branch("truthPionVertexPx", &truthPionVertexPx, "truthPionVertexPx/D");
     RecoEvalTree->Branch("truthPionVertexPy", &truthPionVertexPy, "truthPionVertexPy/D");
@@ -960,6 +971,7 @@ void RecoEval::fillPionTruthData(simb::MCParticle *pion) {
 void RecoEval::fillProtonDaughtersTruthData(std::vector<simb::MCParticle*> daughterProtons) {
     for (simb::MCParticle *proton : daughterProtons) {
         unsigned int protonTrackBegin = firstPointInTPC(proton);
+        unsigned int protonTrackEnd   = lastPointInTPC(proton);
 
         truthProtonsEnergy.push_back(proton->E(protonTrackBegin));
         truthProtonsKEnergy.push_back(proton->E(protonTrackBegin) - ProtonMass);
@@ -967,10 +979,11 @@ void RecoEval::fillProtonDaughtersTruthData(std::vector<simb::MCParticle*> daugh
         truthProtonsInitialPx.push_back(proton->Px(protonTrackBegin));
         truthProtonsInitialPy.push_back(proton->Px(protonTrackBegin));
         truthProtonsInitialPz.push_back(proton->Px(protonTrackBegin));
+        truthProtonsLength.push_back(trackMagnitude(proton, protonTrackBegin, protonTrackEnd));
 
         if (bVerbose) std::cout << "Filled information for proton with id: " << proton->TrackId() << std::endl;
-        if (bVerbose) std::cout << std::endl;
     }
+    if (bVerbose) std::cout << std::endl;
 }
 
 unsigned int RecoEval::lastPointInTPC(simb::MCParticle *track)
@@ -1091,6 +1104,7 @@ void RecoEval::resetTree() {
     truthProtonsInitialPx.clear();
     truthProtonsInitialPy.clear();
     truthProtonsInitialPz.clear();
+    truthProtonsLength.clear();
 
     isTrackInverted.clear();
     recoBeginX.clear();
