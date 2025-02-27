@@ -65,6 +65,9 @@ private:
   // fcl parameters
   bool debug;
 
+  float PROTON_ENERGY_LOWER_BOUND;
+  float PROTON_ENERGY_UPPER_BOUND;
+
   // TTree 
   TTree* fTree; 
 
@@ -76,6 +79,7 @@ private:
   int iNumNucleons;
   int iNumProtons;
   int iNumNeutrons;
+  bool protonsInFinalState;
 
   float fPionInitialEnergy;
   float fPionInitialKEnergy;
@@ -185,8 +189,7 @@ bool SignalPionAbsorption::filter(art::Event & e)
     }
   }
 
-  // TODO: in case we have more than one primary negative pion, flag event and print
-  // run/subrun/event, but reject if for now
+  // In case we have more than one primary particle
   if (nPrimary > 1) {
     std::cout << "Num primary negative pions particles: " << nPrimary << std::endl;
     std::cout << run << " " << subrun << " " << event << std::endl;
@@ -239,6 +242,12 @@ bool SignalPionAbsorption::filter(art::Event & e)
           fTotalOutKEnergy += mcPart->E() - NeutronMass;
         }
         else if (mcPart->PdgCode() == 2212) {
+          // Skip invisible protons
+          float KEnergy = mcPart->E() - ProtonMass;
+          if ((KEnergy < PROTON_ENERGY_LOWER_BOUND) || (KEnergy > PROTON_ENERGY_UPPER_BOUND)) {
+            continue;
+          }
+
           nProtonsPiInelastic++;
           VTotalOutMomentum += VPartMomentum;
           if (fPartMomentum > fLeadingOutMomentum) fLeadingOutMomentum = fPartMomentum;
@@ -258,10 +267,6 @@ bool SignalPionAbsorption::filter(art::Event & e)
   // Reject capture at rest
   if (bCaptureAtRest) return false;
 
-  // Condition for inelastic absorption; after this conditional statement, all non-absorption events have been rejected
-  // EDIT: we accept events with 0 protons coming out, as we reject capture at rest above
-  // if ((nProtonsPiInelastic + nNeutronsPiInelastic) < ) return false;
-
   // Set variables of interest
   iNumNucleons = nProtonsPiInelastic + nNeutronsPiInelastic;
   iNumProtons = nProtonsPiInelastic;
@@ -280,6 +285,12 @@ bool SignalPionAbsorption::filter(art::Event & e)
 
   fCosAngleInOutMomentum = TMath::Cos(VPionVertexMomentum.Angle(VTotalOutMomentum.Vect()));
 
+  if (iNumProtons > 0) {
+    protonsInFinalState = true;
+  } else {
+    protonsInFinalState = false;
+  }
+  
   // Populate tree
   fTree->Fill();
 
@@ -330,6 +341,8 @@ double SignalPionAbsorption::trackMagnitude(simb::MCParticle *track, unsigned in
 void SignalPionAbsorption::reconfigure(fhicl::ParameterSet const & p)
 {                                                                                                   
   debug = p.get<bool>("debug", false);
+  PROTON_ENERGY_LOWER_BOUND = p.get<float>("ProtonEnergyLowerBound", 0.3);
+  PROTON_ENERGY_UPPER_BOUND = p.get<float>("ProtonEnergyUpperBound", 1.0);
 }
 
 void SignalPionAbsorption::beginJob()
@@ -346,6 +359,7 @@ void SignalPionAbsorption::beginJob()
   fTree->Branch("iNumNucleons", &iNumNucleons, "iNumNucleons/I");
   fTree->Branch("iNumProtons", &iNumProtons, "iNumProtons/I");
   fTree->Branch("iNumNeutrons", &iNumNeutrons, "iNumNeutrons/I");
+  fTree->Branch("protonsInFinalState", &protonsInFinalState, "protonsInFinalState/B");
 
   fTree->Branch("fPionInitialEnergy", &fPionInitialEnergy, "fPionInitialEnergy/F");
   fTree->Branch("fPionInitialKEnergy", &fPionInitialKEnergy, "fPionInitialKEnergy/F");

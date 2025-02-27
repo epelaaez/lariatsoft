@@ -28,8 +28,10 @@ physics:
 {
     filters:{
         SignalPionAbsorption:{
-            module_type:      "SignalPionAbsorption"
-	          debug:            false
+            module_type:            "SignalPionAbsorption"
+	          debug:                  false
+            ProtonEnergyLowerBound: 0.3
+            ProtonEnergyUpperBound: 1.0
             }
         }
     
