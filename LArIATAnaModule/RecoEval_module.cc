@@ -475,7 +475,7 @@ void RecoEval::analyze(art::Event const &e) {
 
         primaryPion = mcPart; // assign primary pion pointer
         pionTrackId = primaryPion->TrackId();
-        std::cout << "Found primary pion!" << std::endl;
+        if (bVerbose) std::cout << "Found primary pion!" << std::endl;
         if (bVerbose) std::cout << std::endl;
 
         // Get pion daughters

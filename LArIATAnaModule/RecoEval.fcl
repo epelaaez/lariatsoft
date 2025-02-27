@@ -29,7 +29,7 @@ physics: {
     analyzers: {
         RecoEval: {
             module_type: "RecoEval"
-            Verbose: true
+            Verbose: false
             WCTrackBuilderLabel: wctrack
             TPCTrackHandleLabel: pmtrack
             WC2TPModuleLabel: wctracktpctrackmatch
