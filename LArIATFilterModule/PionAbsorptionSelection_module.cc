@@ -224,9 +224,11 @@ class PionAbsorptionSelection : public art::EDFilter {
         std::string recotrackmcparticlematching_label_;
 
         // fcl parameters
-        bool bVerbose;
+        bool         bVerbose;
         unsigned int MeanDEDXNumberTrajPoints;
-        double fVertexRadius;
+        double       fVertexRadius;
+        double       SmallTrackLength;
+        int          MaxSmallTracks;
 
         // Cut variables
         double fMeanDEDXThreshold;
@@ -244,6 +246,7 @@ class PionAbsorptionSelection : public art::EDFilter {
         int pionVertexInRedVolEventCount = 0;
         int WC2TPCTrackBecomesProton = 0;
         int onlyOutgoingProtonsEventCount = 0;
+        int showerEvents = 0;
 
         // WC variables
         int WC2TPCtrkID = -99999;
@@ -506,6 +509,9 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     // If we made it here, pion vertex is inside reduced volume
     pionVertexInRedVolEventCount++;
 
+    // Count small tracks for shower cut
+    int numSmallTracks = 0;
+
     // Now we want to look at near pion
     for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
         auto thisTrack = tracklist.at(trk_idx);
@@ -518,23 +524,32 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         bool isThisTrackReversed = false;
         bool isThisTrackStopping = false;
 
+        // Order track
         double startDistance = distance(thisTrack->Start().X(), WC2TPCPionEndX, thisTrack->Start().Y(), WC2TPCPionEndY, thisTrack->Start().Z(), WC2TPCPionEndZ);             
         double endDistance = distance(thisTrack->End().X(), WC2TPCPionEndX, thisTrack->End().Y(), WC2TPCPionEndY, thisTrack->End().Z(), WC2TPCPionEndZ);
+
+        if (startDistance < endDistance) {
+            recoBeginning = thisTrack->Start();
+            recoEnd = thisTrack->End();
+        } else {
+            isThisTrackReversed = true;
+            recoBeginning = thisTrack->End();
+            recoEnd = thisTrack->Start();
+        }
+
+        // Check if track counts towards count of small tracks
+        double thisTrackLength = sqrt(
+            pow(recoBeginning.X() - recoEnd.X(), 2) +
+            pow(recoBeginning.Y() - recoEnd.Y(), 2) + 
+            pow(recoBeginning.Z() - recoEnd.Z(), 2)
+        );
+        if (thisTrackLength < SmallTrackLength) numSmallTracks++;
 
         if (bVerbose) std::cout << "Looking at track with start distance: " << startDistance << " and end distance: " << endDistance << std::endl;
         if (bVerbose) std::cout << std::endl;
 
         // Find tracks near pion
         if ((startDistance < fVertexRadius) || (endDistance < fVertexRadius)) {
-            if (startDistance < endDistance) {
-                recoBeginning = thisTrack->Start();
-                recoEnd = thisTrack->End();
-            } else {
-                isThisTrackReversed = true;
-                recoBeginning = thisTrack->End();
-                recoEnd = thisTrack->Start();
-            }
-
             // Check if track stops in fiducial volume
             isThisTrackStopping = isWithinFiducialVolume(recoEnd.X(), recoEnd.Y(), recoEnd.Z());
 
@@ -577,6 +592,12 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         } // end if track begins or ends near pion
     } // end loop over tracks near pion
 
+    // Shower cut
+    if (numSmallTracks > MaxSmallTracks) {
+        showerEvents++;
+        return false;
+    }
+
     // We found an event with only outgoing protons (near pion vertex)
     onlyOutgoingProtonsEventCount++;
 
@@ -600,6 +621,8 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 60);
     fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 3.4);
     fVertexRadius                      = p.get<double>("VertexRadius", 4);
+    SmallTrackLength                   = p.get<double>("SmallTrackLength", 35);
+    MaxSmallTracks                     = p.get<int>("MaxSmallTracks", 5);
 }
 
 void PionAbsorptionSelection::beginJob() {
@@ -623,6 +646,7 @@ void PionAbsorptionSelection::beginJob() {
     PionAbsTree->Branch("pionVertexInRedVolEventCount", &pionVertexInRedVolEventCount, "pionVertexInRedVolEventCount/I");
     PionAbsTree->Branch("WC2TPCTrackBecomesProton", &WC2TPCTrackBecomesProton, "WC2TPCTrackBecomesProton/I");
     PionAbsTree->Branch("onlyOutgoingProtonsEventCount", &onlyOutgoingProtonsEventCount, "onlyOutgoingProtonsEventCount/I");
+    PionAbsTree->Branch("showerEvents", &showerEvents, "showerEvents/I");
 
     PionAbsTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
     PionAbsTree->Branch("WC2TPCPionBeginX", &WC2TPCPionBeginX, "WC2TPCPionBeginX/D");

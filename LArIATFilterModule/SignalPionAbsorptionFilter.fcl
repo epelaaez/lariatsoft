@@ -30,7 +30,7 @@ physics:
         SignalPionAbsorption:{
             module_type:            "SignalPionAbsorption"
 	          debug:                  false
-            ProtonEnergyLowerBound: 0.3
+            ProtonEnergyLowerBound: 0.075
             ProtonEnergyUpperBound: 1.0
             }
         }

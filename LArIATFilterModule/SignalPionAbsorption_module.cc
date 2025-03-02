@@ -341,7 +341,7 @@ double SignalPionAbsorption::trackMagnitude(simb::MCParticle *track, unsigned in
 void SignalPionAbsorption::reconfigure(fhicl::ParameterSet const & p)
 {                                                                                                   
   debug = p.get<bool>("debug", false);
-  PROTON_ENERGY_LOWER_BOUND = p.get<float>("ProtonEnergyLowerBound", 0.3);
+  PROTON_ENERGY_LOWER_BOUND = p.get<float>("ProtonEnergyLowerBound", 0.075);
   PROTON_ENERGY_UPPER_BOUND = p.get<float>("ProtonEnergyUpperBound", 1.0);
 }
 

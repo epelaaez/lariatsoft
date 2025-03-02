@@ -38,6 +38,8 @@ physics: {
             RecoTrackMCMatchLabel:  recotrackmcmatching
             MeanDEDXThreshold:      3.4
             VertexRadius:           4
+            SmallTrackLength:       35
+            MaxSmallTracks:         5
         }
     }
     
