@@ -210,6 +210,7 @@ class PionAbsorptionSelection : public art::EDFilter {
         void resetTree();
         bool isWithinActiveVolume(double x, double y, double z);
         bool isWithinReducedVolume(double x, double y, double z);
+        bool isWithinReducedVolume(simb::MCParticle *track);
         bool isWithinFiducialVolume(double x, double y, double z);
         double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed);
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
@@ -249,7 +250,7 @@ class PionAbsorptionSelection : public art::EDFilter {
         int showerEvents = 0;
 
         // WC variables
-        int WC2TPCtrkID = -99999;
+        int    WC2TPCtrkID = -99999;
         double WCTrackMomentum;
         double WC2TPCPionBeginX;
         double WC2TPCPionBeginY;
@@ -266,26 +267,31 @@ class PionAbsorptionSelection : public art::EDFilter {
         double WC4PionZ;
         double WCTheta;
         double WCPhi;
-        bool isPionReversed = false;
+        bool   isPionReversed = false;
 
-        // Pion truth information
-        int pionTruthPDG; 
-        std::string pionTruthProcess = "";
-        std::vector<int> pionDaughtersPDG;
-        std::vector<std::string> pionDaughtersProcess;
+        // Wire chamber match truth information
+        int                      wcMatchPDG;
+        std::string              wcMatchProcess = "";
+        std::vector<int>         wcMatchDaughtersPDG;
+        std::vector<std::string> wcMatchDaughtersProcess;
+
+        // Truth pion information
+        int                      truthPrimaryPDG;
+        std::vector<int>         truthPrimaryDaughtersPDG;
+        std::vector<std::string> truthPrimaryDaughtersProcess;
 
         // Proton tracks
-        int protonCount = 0;
-        std::vector<double> protonBeginX;
-        std::vector<double> protonBeginY;
-        std::vector<double> protonBeginZ;
-        std::vector<double> protonEndX;
-        std::vector<double> protonEndY;
-        std::vector<double> protonEndZ;
-        std::vector<double> protonTrkID;
-        std::vector<double> protonLength;
-        std::vector<bool>   isProtonInverted;
-        std::vector<bool>   isProtonStopping;
+        int                      protonCount = 0;
+        std::vector<double>      protonBeginX;
+        std::vector<double>      protonBeginY;
+        std::vector<double>      protonBeginZ;
+        std::vector<double>      protonEndX;
+        std::vector<double>      protonEndY;
+        std::vector<double>      protonEndZ;
+        std::vector<double>      protonTrkID;
+        std::vector<double>      protonLength;
+        std::vector<bool>        isProtonInverted;
+        std::vector<bool>        isProtonStopping;
         std::vector<std::string> protonTrueProcess;
 
         // Masses
@@ -434,6 +440,24 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
         find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
 
+    // Identify true-level primary pion and get its information
+    std::vector<int> primaryDaughtersIDs;
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (part->Process() == "primary") {
+            truthPrimaryPDG = part->PdgCode();
+            for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
+            break;
+        }
+    }
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
+            truthPrimaryDaughtersProcess.push_back(part->Process());
+            truthPrimaryDaughtersPDG.push_back(part->PdgCode());
+        }
+    }
+
     //////////////////////
     // Selection algorithm
     //////////////////////
@@ -484,8 +508,8 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
                 std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
                 
                 auto const& particle = particles.front();
-                pionTruthPDG = particle->PdgCode();
-                pionTruthProcess = particle->Process();
+                wcMatchPDG     = particle->PdgCode();
+                wcMatchProcess = particle->Process();
                 
                 // Get daughters IDs
                 std::vector<int> daughterIDs;
@@ -494,8 +518,8 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
                 for (size_t p = 0; p < plist.size(); ++p) {
                     auto part = plist.Particle(p);
                     if (std::find(daughterIDs.begin(), daughterIDs.end(), part->TrackId()) != daughterIDs.end()) {
-                        pionDaughtersProcess.push_back(part->Process());
-                        pionDaughtersPDG.push_back(part->PdgCode());
+                        wcMatchDaughtersProcess.push_back(part->Process());
+                        wcMatchDaughtersPDG.push_back(part->PdgCode());
                     }
                 }
             }
@@ -637,10 +661,14 @@ void PionAbsorptionSelection::beginJob() {
     PionAbsTree->Branch("Event", &event, "event/I");
 
     PionAbsTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
-    PionAbsTree->Branch("pionTruthPDG", &pionTruthPDG, "pionTruthPDG/I");
-    PionAbsTree->Branch("pionTruthProcess", "std::string", &pionTruthProcess);
-    PionAbsTree->Branch("pionDaughtersPDG", "std::vector<int>", &pionDaughtersPDG);
-    PionAbsTree->Branch("pionDaughtersProcess", "std::vector<std::string>", &pionDaughtersProcess);
+    PionAbsTree->Branch("wcMatchPDG", &wcMatchPDG, "wcMatchPDG/I");
+    PionAbsTree->Branch("wcMatchProcess", "std::string", &wcMatchProcess);
+    PionAbsTree->Branch("wcMatchDaughtersPDG", "std::vector<int>", &wcMatchDaughtersPDG);
+    PionAbsTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
+
+    PionAbsTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
+    PionAbsTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
+    PionAbsTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
 
     PionAbsTree->Branch("totalEventCount", &totalEventCount, "totalEventCount/I");
     PionAbsTree->Branch("pionVertexInRedVolEventCount", &pionVertexInRedVolEventCount, "pionVertexInRedVolEventCount/I");
@@ -681,10 +709,14 @@ void PionAbsorptionSelection::endJob() {
 void PionAbsorptionSelection::resetTree() {
     WC2TPCtrkID = -99999;
     isPionReversed = false;
-    pionTruthPDG = -99999;
-    pionTruthProcess = "";
-    pionDaughtersPDG.clear();
-    pionDaughtersProcess.clear();
+    wcMatchPDG = -99999;
+    wcMatchProcess = "";
+    wcMatchDaughtersPDG.clear();
+    wcMatchDaughtersProcess.clear();
+
+    truthPrimaryPDG = -99999;
+    truthPrimaryDaughtersPDG.clear();
+    truthPrimaryDaughtersProcess.clear();
 
     protonCount = 0;
     protonBeginX.clear();
@@ -779,6 +811,14 @@ bool PionAbsorptionSelection::isWithinReducedVolume(double x, double y, double z
     if (z < RminZ ) return false; 
     if (z > RmaxZ ) return false;
     return true;
+}
+
+bool PionAbsorptionSelection::isWithinReducedVolume(simb::MCParticle *track) {
+    return (
+        (track->EndX() > RminX) && (track->EndX() < RmaxX) && 
+        (track->EndY() > RminY) && (track->EndY() < RmaxY) && 
+        (track->EndZ() > RminZ) && (track->EndZ() < RmaxZ)
+    );
 }
 
 bool PionAbsorptionSelection::isWithinFiducialVolume(double x, double y, double z) {
