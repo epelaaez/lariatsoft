@@ -780,7 +780,7 @@ void PionAbsorptionSelection::fillSignalInformation(
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
         if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
         if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) return;
-        if (daughtersProcess[iDaughter] == "Decay") return;
+        if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) return;
 
         if (daughtersProcess[iDaughter] == "pi-Inelastic") {
             if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { return; } // muon
