@@ -211,9 +211,10 @@ class PionAbsorptionSelection : public art::EDFilter {
         bool isWithinActiveVolume(double x, double y, double z);
         bool isWithinReducedVolume(double x, double y, double z);
         bool isWithinReducedVolume(simb::MCParticle *track);
-        bool isWithinFiducialVolume(double x, double y, double z);
+        int lastPointInTPC(simb::MCParticle *track);
         double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed);
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
+        void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
 
     private:
         // Produce's names
@@ -230,6 +231,8 @@ class PionAbsorptionSelection : public art::EDFilter {
         double       fVertexRadius;
         double       SmallTrackLength;
         int          MaxSmallTracks;
+        float        PROTON_ENERGY_LOWER_BOUND;
+        float        PROTON_ENERGY_UPPER_BOUND;
 
         // Cut variables
         double fMeanDEDXThreshold;
@@ -275,10 +278,18 @@ class PionAbsorptionSelection : public art::EDFilter {
         std::vector<int>         wcMatchDaughtersPDG;
         std::vector<std::string> wcMatchDaughtersProcess;
 
-        // Truth pion information
+        // Truth primary information
         int                      truthPrimaryPDG;
+        float                    truthPrimaryVertexX;
+        float                    truthPrimaryVertexY;
+        float                    truthPrimaryVertexZ;
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
+        std::vector<double>      truthPrimaryDaughtersKE;
+
+        // Signal information
+        bool isPionAbsorptionSignal;
+        int  numVisibleProtons;
 
         // Proton tracks
         int                      protonCount = 0;
@@ -314,14 +325,6 @@ class PionAbsorptionSelection : public art::EDFilter {
         const double RmaxY = 15.0; 
         const double RminZ =  8.0;
         const double RmaxZ = 82.0;
-
-        // Fiducial volume
-        const double FminX =  2.0;
-        const double FmaxX = 45.0;
-        const double FminY =-18.0;
-        const double FmaxY = 18.0;
-        const double FminZ =  5.0;
-        const double FmaxZ = 85.0;
 };
 
 PionAbsorptionSelection::PionAbsorptionSelection(fhicl::ParameterSet const &p) : EDFilter(p) {
@@ -447,6 +450,9 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         if (part->Process() == "primary") {
             truthPrimaryPDG = part->PdgCode();
             for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
+            truthPrimaryVertexX = part->EndX();
+            truthPrimaryVertexY = part->EndY();
+            truthPrimaryVertexZ = part->EndZ(); 
             break;
         }
     }
@@ -455,8 +461,19 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
             truthPrimaryDaughtersProcess.push_back(part->Process());
             truthPrimaryDaughtersPDG.push_back(part->PdgCode());
+            truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
         }
     }
+
+    fillSignalInformation(
+        truthPrimaryPDG, 
+        truthPrimaryVertexX,
+        truthPrimaryVertexY,
+        truthPrimaryVertexZ,
+        truthPrimaryDaughtersPDG,
+        truthPrimaryDaughtersProcess,
+        truthPrimaryDaughtersKE
+    );
 
     //////////////////////
     // Selection algorithm
@@ -575,7 +592,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         // Find tracks near pion
         if ((startDistance < fVertexRadius) || (endDistance < fVertexRadius)) {
             // Check if track stops in fiducial volume
-            isThisTrackStopping = isWithinFiducialVolume(recoEnd.X(), recoEnd.Y(), recoEnd.Z());
+            isThisTrackStopping = isWithinReducedVolume(recoEnd.X(), recoEnd.Y(), recoEnd.Z());
 
             // Reject events with outgoing pions
             double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed);
@@ -647,6 +664,8 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     fVertexRadius                      = p.get<double>("VertexRadius", 4);
     SmallTrackLength                   = p.get<double>("SmallTrackLength", 35);
     MaxSmallTracks                     = p.get<int>("MaxSmallTracks", 5);
+    PROTON_ENERGY_LOWER_BOUND          = p.get<float>("ProtonEnergyLowerBound", 0.075);
+    PROTON_ENERGY_UPPER_BOUND          = p.get<float>("ProtonEnergyUpperBound", 1.0);
 }
 
 void PionAbsorptionSelection::beginJob() {
@@ -667,8 +686,15 @@ void PionAbsorptionSelection::beginJob() {
     PionAbsTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
 
     PionAbsTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
+    PionAbsTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/F");
+    PionAbsTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/F");
+    PionAbsTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/F");
     PionAbsTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
     PionAbsTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
+    PionAbsTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
+
+    PionAbsTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
+    PionAbsTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
 
     PionAbsTree->Branch("totalEventCount", &totalEventCount, "totalEventCount/I");
     PionAbsTree->Branch("pionVertexInRedVolEventCount", &pionVertexInRedVolEventCount, "pionVertexInRedVolEventCount/I");
@@ -717,6 +743,10 @@ void PionAbsorptionSelection::resetTree() {
     truthPrimaryPDG = -99999;
     truthPrimaryDaughtersPDG.clear();
     truthPrimaryDaughtersProcess.clear();
+    truthPrimaryDaughtersKE.clear();
+    truthPrimaryVertexX = -99999;
+    truthPrimaryVertexY = -99999;
+    truthPrimaryVertexZ = -99999;
 
     protonCount = 0;
     protonBeginX.clear();
@@ -730,6 +760,42 @@ void PionAbsorptionSelection::resetTree() {
     isProtonInverted.clear();
     isProtonStopping.clear();
     protonTrueProcess.clear();
+
+    isPionAbsorptionSignal = false;
+    numVisibleProtons = 0;
+}
+
+void PionAbsorptionSelection::fillSignalInformation(
+    int pdg,
+    float vx, float vy, float vz,
+    std::vector<int> daughtersPDG, 
+    std::vector<std::string> daughtersProcess, 
+    std::vector<double> daughtersKE
+) {
+    if (pdg != -211) return;
+    if (!isWithinReducedVolume(vx, vy, vz)) return;
+
+    int numDaughters = daughtersPDG.size();
+    int tempNumProtons = 0;
+    for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
+        if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
+        if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) return;
+        if (daughtersProcess[iDaughter] == "Decay") return;
+
+        if (daughtersProcess[iDaughter] == "pi-Inelastic") {
+            if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { return; } // muon
+            else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { return; } // kaon
+            else if (daughtersPDG[iDaughter] == 2212) {
+                if ((daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND) && (daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND)) {
+                    tempNumProtons++;
+                }
+            }
+        }
+    }
+
+    numVisibleProtons = tempNumProtons;
+    isPionAbsorptionSignal = true;
+    return;
 }
 
 double PionAbsorptionSelection::meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed) {
@@ -794,23 +860,19 @@ double PionAbsorptionSelection::distance(double x1, double x2, double y1, double
 }
 
 bool PionAbsorptionSelection::isWithinActiveVolume(double x, double y, double z) {
-    if (x < minX ) return false; 
-    if (x > maxX ) return false;
-    if (y < minY ) return false; 
-    if (y > maxY ) return false;
-    if (z < minZ ) return false; 
-    if (z > maxZ ) return false;
-    return true;
+    return (
+        (x > RminX) && (x < RmaxX) && 
+        (y > RminY) && (y < RmaxY) && 
+        (z > RminZ) && (z < RmaxZ)
+    );
 }
 
 bool PionAbsorptionSelection::isWithinReducedVolume(double x, double y, double z) {
-    if (x < RminX ) return false; 
-    if (x > RmaxX ) return false;
-    if (y < RminY ) return false; 
-    if (y > RmaxY ) return false;
-    if (z < RminZ ) return false; 
-    if (z > RmaxZ ) return false;
-    return true;
+    return (
+        (x > RminX) && (x < RmaxX) && 
+        (y > RminY) && (y < RmaxY) && 
+        (z > RminZ) && (z < RmaxZ)
+    );
 }
 
 bool PionAbsorptionSelection::isWithinReducedVolume(simb::MCParticle *track) {
@@ -821,14 +883,15 @@ bool PionAbsorptionSelection::isWithinReducedVolume(simb::MCParticle *track) {
     );
 }
 
-bool PionAbsorptionSelection::isWithinFiducialVolume(double x, double y, double z) {
-    if (x < FminX ) return false; 
-    if (x > FmaxX ) return false;
-    if (y < FminY ) return false; 
-    if (y > FmaxY ) return false;
-    if (z < FminZ ) return false; 
-    if (z > FmaxZ ) return false;
-    return true;
+int PionAbsorptionSelection::lastPointInTPC(simb::MCParticle *track) {
+    for (int i=track->NumberTrajectoryPoints()-1; i >=0; i--) {
+        if (
+            (track->Vx(i)>minX) && (track->Vx(i)<maxX) && 
+            (track->Vy(i)>minY) && (track->Vy(i)<maxY) && 
+            (track->Vz(i)>minZ) && (track->Vz(i)<maxZ)
+        ) return i; // If present in TPC, return last point
+    }
+    return 9999;
 }
 
 DEFINE_ART_MODULE(PionAbsorptionSelection)
