@@ -4,7 +4,7 @@
 // File:        ShowerRecoEval_module.cc
 //
 // Written by Emilio Peláez, created on January 2025. Adapted from XSAnalysis module
-// and ShowerRecoEval module by Matt King.
+// and RecoEval module by Matt King.
 ////////////////////////////////////////////////////////////////////////
 
 // ########################
@@ -218,6 +218,7 @@ class ShowerRecoEval : public art::EDAnalyzer {
         double trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2);
         double trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2);
         bool isWithinActiveVolume(double x, double y, double z);
+        double computeCurvature(recob::Track track);
 
     private: 
         // Produce's names
@@ -261,6 +262,7 @@ class ShowerRecoEval : public art::EDAnalyzer {
         // Reco variables 
         std::vector<double> recoLength;
         std::vector<int> recoTrkID;
+        double WCMatchCurvature;
 
         // Truth variables for particles matched to tracks
         std::vector<int>    matchedIdentity;
@@ -368,8 +370,7 @@ void ShowerRecoEval::analyze(art::Event const &e) {
 
             WC2TPCPrimaryBeginX = recoWC2TPCBeginning.X();
             WC2TPCPrimaryBeginY = recoWC2TPCBeginning.Y();
-            WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();
-
+            WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();            
         } // end trackWC2TPC loop
     } // end if fWC2TPC.isValid()
 
@@ -500,6 +501,12 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         // Get TPC track
         auto thisTrack = tracklist.at(trkIdx);
 
+        // Track matched to WC
+        if (thisTrack->ID() == WC2TPCtrkID) {
+          // Compute curvature measure
+          WCMatchCurvature = computeCurvature(*thisTrack);
+        }
+
         // At this point, we have:
         //     particle: matched MCParticle
         //     thisTrack: reconstructed track
@@ -569,6 +576,7 @@ void ShowerRecoEval::beginJob() {
 
     ShowerRecoEvalTree->Branch("recoTrkID", "std::vector<int>", &recoTrkID);
     ShowerRecoEvalTree->Branch("recoLength", "std::vector<double>", &recoLength);
+    ShowerRecoEvalTree->Branch("WCMatchCurvature", &WCMatchCurvature, "WCMatchCurvature/D");
 
     ShowerRecoEvalTree->Branch("matchedIdentity", "std::vector<int>", &matchedIdentity);
     ShowerRecoEvalTree->Branch("matchedTrkID", "std::vector<int>", &matchedTrkID);
@@ -645,6 +653,42 @@ bool ShowerRecoEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim:
 
     // Recursion for mother
     return isPosterityOfPrimary(plist.Particle(motherPosition), plist);
+}
+
+double ShowerRecoEval::computeCurvature(recob::Track track) {
+  // First, we get the first and last point
+  recob::TrackTrajectory::Point_t firstPoint = track.Start();
+  recob::TrackTrajectory::Point_t lastPoint = track.End();
+
+  // Define lambdas
+  auto norm = [](double x, double y, double z) {
+    return sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
+  };
+
+  auto cross_norm = [norm](double a_1, double a_2, double a_3, double b_1, double b_2, double b_3) {
+    return norm(a_2 * b_3 - a_3 * b_2, a_3 * b_1 - a_1 * b_3, a_1 * b_2 - a_2 * b_1);
+  };
+
+  // Compute line
+  double lineX = firstPoint.X() - lastPoint.X();
+  double lineY = firstPoint.Y() - lastPoint.Y();
+  double lineZ = firstPoint.Z() - lastPoint.Z();
+  double normLine = norm(lineX, lineY, lineZ);
+
+  // Find largest distance
+  double distance = 0;
+  for (size_t iPoint = 0; iPoint < track.NPoints(); iPoint++) {
+    recob::TrackTrajectory::Point_t currentPoint = track.LocationAtPoint(iPoint);
+    double tempDistance = cross_norm(
+      lineX, lineY, lineZ, 
+      currentPoint.X() - firstPoint.X(),
+      currentPoint.Y() - firstPoint.Y(),
+      currentPoint.Z() - firstPoint.Z()
+    ) / normLine;
+    if (tempDistance > distance) distance = tempDistance;
+  }
+
+  return distance;
 }
 
 double ShowerRecoEval::trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2)
