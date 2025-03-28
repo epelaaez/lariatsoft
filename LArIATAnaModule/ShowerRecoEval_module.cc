@@ -105,6 +105,9 @@
 #include <TH2F.h>
 #include <TGraph.h>
 #include <TTree.h>
+#include "TMatrixD.h"
+#include "TDecompSVD.h"
+#include "TVectorD.h"
 
 // ####################
 // ### C++ includes ###
@@ -112,6 +115,7 @@
 #include <map>
 #include <memory>
 #include <fstream>
+#include <tuple>
 #include "math.h"
 #include <algorithm>
 
@@ -218,7 +222,10 @@ class ShowerRecoEval : public art::EDAnalyzer {
         double trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2);
         double trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2);
         bool isWithinActiveVolume(double x, double y, double z);
-        double computeCurvature(recob::Track track);
+        bool isWithinReducedVolume(double x, double y, double z);
+        std::tuple<double, double> computeCurvature(recob::Track track);
+        double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
+        void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
 
     private: 
         // Produce's names
@@ -229,13 +236,12 @@ class ShowerRecoEval : public art::EDAnalyzer {
         std::string simulation_producer_label_;
         std::string recotrackmcparticlematching_label_;
 
-        // File for saving event data
-        std::ofstream outFile;
-
         // fcl parameters
         bool bVerbose;
         unsigned int MeanDEDXNumberTrajPoints;
         double TrackStitchingThreshold;
+        float PROTON_ENERGY_LOWER_BOUND;
+        float PROTON_ENERGY_UPPER_BOUND;
 
         // Output tree
         TTree *ShowerRecoEvalTree;
@@ -252,8 +258,12 @@ class ShowerRecoEval : public art::EDAnalyzer {
         int numEmmitedPhotons = 0;
         std::vector<double> truthElectronsLength;
 
+        // Signal information
+        bool isPionAbsorptionSignal;
+        int  numVisibleProtons;
+
         // WC variables
-        int WC2TPCtrkID;
+        int WC2TPCtrkID = -99999;
         double WCTrackMomentum;
         double WC2TPCPrimaryBeginX;
         double WC2TPCPrimaryBeginY;
@@ -262,7 +272,8 @@ class ShowerRecoEval : public art::EDAnalyzer {
         // Reco variables 
         std::vector<double> recoLength;
         std::vector<int> recoTrkID;
-        double WCMatchCurvature;
+        double WCMeanCurvature;
+        double WCMaxCurvature;
 
         // Truth variables for particles matched to tracks
         std::vector<int>    matchedIdentity;
@@ -390,11 +401,6 @@ void ShowerRecoEval::analyze(art::Event const &e) {
     std::vector<simb::MCParticle*> primaryDaughters; 
     std::vector<int>               primaryDaughtersTrackIds;
 
-    // Catch data about events we want
-    if ((event == 128242) || (event == 128206) || (event == 128243)) {
-      outFile << "Event: " << event << std::endl;
-    }
-
     // Loop over all Geant4 particles using the BackTracker
     for (size_t p = 0; p < plist.size(); ++p) {
         auto mcPart = plist.Particle(p);
@@ -406,17 +412,17 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         if (!(particleProcess.find("primary") != std::string::npos)) continue;
 
         primaryParticle = mcPart; // assign primary particle pointer
-        primaryParticlePDG = mcPart->PdgCode();
+        primaryParticlePDG = primaryParticle->PdgCode();
         primaryParticleTrackID = primaryParticle->TrackId();
         if (bVerbose) std::cout << "Found primary particle!" << std::endl;
         if (bVerbose) std::cout << std::endl;
 
-        if ((event == 128242) || (event == 128206) || (event == 128243)) {
-          outFile << "Primary particle: " << primaryParticlePDG << std::endl;
-        }
-
         // Get primary daughters
         int numDaughters = primaryParticle->NumberDaughters();
+        std::vector<int>         primaryParticleDaughtersPDG;
+        std::vector<std::string> primaryParticleDaughtersProcess;
+        std::vector<double>      primaryParticleDaughtersKE;
+
         for (int iDaughter = 0; iDaughter < numDaughters; ++iDaughter) {
             int thisDaughterTrackId = primaryParticle->Daughter(iDaughter);
             simb::MCParticle *thisDaughter = NULL;
@@ -431,24 +437,24 @@ void ShowerRecoEval::analyze(art::Event const &e) {
 
             if (thisDaughter->Process() == "eBrem" && thisDaughter->PdgCode() == 22) numEmmitedPhotons++;
             if (thisDaughter->Process() == "eIoni" && thisDaughter->PdgCode() == 11) {
-                truthElectronsLength.push_back(trackMagnitude(thisDaughter));
-                numEmmitedElectrons++;
+              truthElectronsLength.push_back(trackMagnitude(thisDaughter));
+              numEmmitedElectrons++;
             }
 
-            if ((event == 128242) || (event == 128206) || (event == 128243)) {
-              outFile << "    Daughter: " << thisDaughter->PdgCode() << std::endl;
-              outFile << "        Begin X: " << thisDaughter->Vx(0);
-              outFile << " Y: " << thisDaughter->Vy(0);
-              outFile << " Z: " << thisDaughter->Vz(0) << std::endl;;
-              outFile << "        End X: " << thisDaughter->Vx(thisDaughter->NumberTrajectoryPoints());
-              outFile << " Y: " << thisDaughter->Vy(thisDaughter->NumberTrajectoryPoints());
-              outFile << " Z: " << thisDaughter->Vz(thisDaughter->NumberTrajectoryPoints()) << std::endl;;
-            }
+            primaryParticleDaughtersPDG.push_back(thisDaughter->PdgCode());
+            primaryParticleDaughtersProcess.push_back(thisDaughter->Process());
+            primaryParticleDaughtersKE.push_back(thisDaughter->E() - thisDaughter->Mass());
         } // end daughters loop
-
-        if ((event == 128242) || (event == 128206) || (event == 128243)) {
-          outFile << std::endl;
-        }
+        
+        fillSignalInformation(
+          primaryParticlePDG,
+          primaryParticle->EndX(), 
+          primaryParticle->EndY(), 
+          primaryParticle->EndZ(),
+          primaryParticleDaughtersPDG,
+          primaryParticleDaughtersProcess,
+          primaryParticleDaughtersKE
+        );
 
         break; // Break once we find primary particle
     } // end Geant4 particle loop
@@ -489,27 +495,16 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trkIdx);
         std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trkIdx);
 
-        // If reco track is not matched to anything, continue
-        if (btdata_vector.size() == 0) continue;
-
-        // Get MCParticle object and data
-        auto const& particle = particles.front();
-        int const pdg_code   = particle->PdgCode();
-        int const g4_trk_id  = particle->TrackId();
-        std::string process  = particle->Process();
-
         // Get TPC track
         auto thisTrack = tracklist.at(trkIdx);
 
         // Track matched to WC
         if (thisTrack->ID() == WC2TPCtrkID) {
           // Compute curvature measure
-          WCMatchCurvature = computeCurvature(*thisTrack);
+          auto [meanCurvature, maxCurvature] = computeCurvature(*thisTrack);
+          WCMeanCurvature = meanCurvature;
+          WCMaxCurvature  = maxCurvature;
         }
-
-        // At this point, we have:
-        //     particle: matched MCParticle
-        //     thisTrack: reconstructed track
 
         recob::TrackTrajectory::Point_t recoBeginning = thisTrack->Start();
         recob::TrackTrajectory::Point_t recoEnd = thisTrack->End();
@@ -523,27 +518,24 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         recoLength.push_back(thisTrackLength);
         recoTrkID.push_back(thisTrack->ID());
 
+        // If reco track is not matched to anything, continue
+        if (btdata_vector.size() == 0) continue;
+
+        // Get MCParticle object and data
+        auto const& particle = particles.front();
+        int const pdg_code   = particle->PdgCode();
+        int const g4_trk_id  = particle->TrackId();
+        std::string process  = particle->Process();
+
+        // At this point, we have:
+        //     particle: matched MCParticle
+        //     thisTrack: reconstructed track
+
         matchedIdentity.push_back(pdg_code);
         matchedLength.push_back(trackMagnitude(particle));
         matchedTrkID.push_back(g4_trk_id);
         matchedProcess.push_back(process);
-
-        if ((event == 128242) || (event == 128206) || (event == 128243)) {
-          outFile << "Track w/ truth-matched PDG: " << pdg_code << std::endl;
-          outFile << "    Begin X: " << recoBeginning.X();
-          outFile << " Y: " << recoBeginning.Y();
-          outFile << " Z: " << recoBeginning.Z() << std::endl;
-          outFile << "    End X: " << recoEnd.X();
-          outFile << " Y: " << recoEnd.Y();
-          outFile << " Z: " << recoEnd.Z() << std::endl;
-          outFile << std::endl;
-        }
-
     } // end loop over tracks
-
-    if ((event == 128242) || (event == 128206) || (event == 128243)) {
-      outFile << std::endl;
-    }
 
     if (bVerbose) std::cout << std::endl;
     ShowerRecoEvalTree->Fill();
@@ -551,8 +543,7 @@ void ShowerRecoEval::analyze(art::Event const &e) {
 
 void ShowerRecoEval::beginJob() {
     if (bVerbose) std::cout << "Beginning job." << std::endl;
-    outFile.open("Events.txt");
-
+  
     art::ServiceHandle<art::TFileService> tfs;
 
     // Make histograms and tree branches
@@ -576,7 +567,11 @@ void ShowerRecoEval::beginJob() {
 
     ShowerRecoEvalTree->Branch("recoTrkID", "std::vector<int>", &recoTrkID);
     ShowerRecoEvalTree->Branch("recoLength", "std::vector<double>", &recoLength);
-    ShowerRecoEvalTree->Branch("WCMatchCurvature", &WCMatchCurvature, "WCMatchCurvature/D");
+    ShowerRecoEvalTree->Branch("WCMeanCurvature", &WCMeanCurvature, "WCMeanCurvature/D");
+    ShowerRecoEvalTree->Branch("WCMaxCurvature", &WCMaxCurvature, "WCMaxCurvature/D");
+
+    ShowerRecoEvalTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
+    ShowerRecoEvalTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
 
     ShowerRecoEvalTree->Branch("matchedIdentity", "std::vector<int>", &matchedIdentity);
     ShowerRecoEvalTree->Branch("matchedTrkID", "std::vector<int>", &matchedTrkID);
@@ -655,41 +650,124 @@ bool ShowerRecoEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim:
     return isPosterityOfPrimary(plist.Particle(motherPosition), plist);
 }
 
-double ShowerRecoEval::computeCurvature(recob::Track track) {
-  // First, we get the first and last point
-  recob::TrackTrajectory::Point_t firstPoint = track.Start();
-  recob::TrackTrajectory::Point_t lastPoint = track.End();
+std::tuple<double, double> ShowerRecoEval::computeCurvature(recob::Track track) {
+  // // Largest distance from arc
 
-  // Define lambdas
-  auto norm = [](double x, double y, double z) {
-    return sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
-  };
+  // // First, we get the first and last point
+  // recob::TrackTrajectory::Point_t firstPoint = track.Start();
+  // recob::TrackTrajectory::Point_t lastPoint = track.End();
 
-  auto cross_norm = [norm](double a_1, double a_2, double a_3, double b_1, double b_2, double b_3) {
-    return norm(a_2 * b_3 - a_3 * b_2, a_3 * b_1 - a_1 * b_3, a_1 * b_2 - a_2 * b_1);
-  };
+  // // Compute line
+  // TVectorD a(3); TVectorD n(3);
+  // a(0) = firstPoint.X(); a(1) = firstPoint.Y(); a(2) = firstPoint.Z();
+  // n(0) = lastPoint.X() - firstPoint.X();
+  // n(1) = lastPoint.Y() - firstPoint.Y();
+  // n(2) = lastPoint.Z() - firstPoint.Z();
+  // TVectorD n_unit = n * (1 / sqrt(n.Norm2Sqr()));
 
-  // Compute line
-  double lineX = firstPoint.X() - lastPoint.X();
-  double lineY = firstPoint.Y() - lastPoint.Y();
-  double lineZ = firstPoint.Z() - lastPoint.Z();
-  double normLine = norm(lineX, lineY, lineZ);
+  // // Find largest distance
+  // double distance = 0;
+  // for (size_t iPoint = 0; iPoint < track.NPoints(); iPoint++) {
+  //   recob::TrackTrajectory::Point_t currentPoint = track.LocationAtPoint(iPoint);
+  //   TVectorD p(3);
+  //   p(0) = currentPoint.X(); p(1) = currentPoint.Y(); p(2) = currentPoint.Z();
+  //   TVectorD distanceVector = (a - p) - n_unit * ((a - p) * n_unit);
+  //   double tempDistance = sqrt(distanceVector.Norm2Sqr());
+  //   if (tempDistance > distance) distance = tempDistance;
+  // }
 
-  // Find largest distance
-  double distance = 0;
-  for (size_t iPoint = 0; iPoint < track.NPoints(); iPoint++) {
-    recob::TrackTrajectory::Point_t currentPoint = track.LocationAtPoint(iPoint);
-    double tempDistance = cross_norm(
-      lineX, lineY, lineZ, 
-      currentPoint.X() - firstPoint.X(),
-      currentPoint.Y() - firstPoint.Y(),
-      currentPoint.Z() - firstPoint.Z()
-    ) / normLine;
-    if (tempDistance > distance) distance = tempDistance;
+  // return distance;
+
+  // // Comparing track length to distance between first and last point
+  
+  // // First, we get the first and last point
+  // recob::TrackTrajectory::Point_t firstPoint = track.Start();
+  // recob::TrackTrajectory::Point_t lastPoint = track.End();
+
+  // double firstToLast = sqrt(
+  //   pow(firstPoint.X() - lastPoint.X(), 2) + 
+  //   pow(firstPoint.Y() - lastPoint.Y(), 2) + 
+  //   pow(firstPoint.Z() - lastPoint.Z(), 2)
+  // );
+
+  // return TMath::Abs(track.Length() - firstToLast);
+
+  // Compute curvature for every three contiguous points
+  
+  double meanCurvature = 0;
+  double maxCurvature  = 0;
+  for (size_t iPoint = 0; iPoint < track.NPoints() - 2; iPoint++) {
+    recob::TrackTrajectory::Point_t p1_ = track.LocationAtPoint(iPoint);
+    recob::TrackTrajectory::Point_t p2_ = track.LocationAtPoint(iPoint + 1);
+    recob::TrackTrajectory::Point_t p3_ = track.LocationAtPoint(iPoint + 2);
+    TVector3 p1, p2, p3;
+    p1(0) = p1_.X(); p1(1) = p1_.Y(); p1(2) = p1_.Z();
+    p2(0) = p2_.X(); p2(1) = p2_.Y(); p2(2) = p2_.Z();
+    p3(0) = p3_.X(); p3(1) = p3_.Y(); p3(2) = p3_.Z();
+
+    double curvatureAtPoint = curvatureForThreePoints(p1, p2, p3);
+    meanCurvature += curvatureAtPoint / (track.NPoints() - 2);
+    if (curvatureAtPoint > maxCurvature) maxCurvature = curvatureAtPoint;
   }
 
-  return distance;
+  return std::make_tuple(meanCurvature, maxCurvature);
 }
+
+double ShowerRecoEval::curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3) {
+  // From: https://en.wikipedia.org/wiki/Circumcircle#Cartesian_coordinates_from_cross-_and_dot-products 
+
+  // Edges of a triangle
+  TVector3 t = p1 - p2;
+  TVector3 u = p3 - p1;
+  TVector3 v = p2 - p3;
+
+  // Normal to the triangle
+  TVector3 w = t.Cross(v);
+
+  double tt = TMath::Sqrt(t * t);
+  double uu = TMath::Sqrt(u * u);
+  double vv = TMath::Sqrt(v * v);
+  double ww = TMath::Sqrt(w * w);
+
+  // If area of triangle is too small, no curvature
+  if (ww < 10e-14) return 0;
+
+  return (2 * ww) / (tt * uu * vv);
+}
+
+void ShowerRecoEval::fillSignalInformation(
+  int pdg,
+  float vx, float vy, float vz,
+  std::vector<int> daughtersPDG, 
+  std::vector<std::string> daughtersProcess, 
+  std::vector<double> daughtersKE
+) {
+  if (pdg != -211) return;
+  if (!isWithinReducedVolume(vx, vy, vz)) return;
+
+  int numDaughters = daughtersPDG.size();
+  int tempNumProtons = 0;
+  for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
+      if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
+      if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) return;
+      if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) return;
+
+      if (daughtersProcess[iDaughter] == "pi-Inelastic") {
+          if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { return; } // muon
+          else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { return; } // kaon
+          else if (daughtersPDG[iDaughter] == 2212) {
+              if ((daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND) && (daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND)) {
+                  tempNumProtons++;
+              }
+          }
+      }
+  }
+
+  numVisibleProtons = tempNumProtons;
+  isPionAbsorptionSignal = true;
+  return;
+}
+
 
 double ShowerRecoEval::trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2)
 {
@@ -736,6 +814,14 @@ bool ShowerRecoEval::isWithinActiveVolume(double x, double y, double z) {
     return true;
 }
 
+bool ShowerRecoEval::isWithinReducedVolume(double x, double y, double z) {
+  return (
+      (x > RminX) && (x < RmaxX) && 
+      (y > RminY) && (y < RmaxY) && 
+      (z > RminZ) && (z < RmaxZ)
+  );
+}
+
 void ShowerRecoEval::resetTree() {
     numEmmitedElectrons = 0;
     numEmmitedPhotons = 0;
@@ -748,6 +834,13 @@ void ShowerRecoEval::resetTree() {
     matchedTrkID.clear();
     matchedProcess.clear();
     matchedLength.clear();
+
+    WCMeanCurvature = -99999;
+    WCMaxCurvature  = -99999;
+    WC2TPCtrkID = -99999;
+
+    isPionAbsorptionSignal = false;
+    numVisibleProtons = 0;
 }
 
 void ShowerRecoEval::endJob() {
@@ -764,6 +857,8 @@ void ShowerRecoEval::reconfigure(fhicl::ParameterSet const & p) {
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
     MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 60);
     TrackStitchingThreshold            = p.get<double> ("TrackStitchingThreshold",4);
+    PROTON_ENERGY_LOWER_BOUND          = p.get<float>("ProtonEnergyLowerBound", 0.075);
+    PROTON_ENERGY_UPPER_BOUND          = p.get<float>("ProtonEnergyUpperBound", 1.0);
 }
 
 DEFINE_ART_MODULE(ShowerRecoEval)

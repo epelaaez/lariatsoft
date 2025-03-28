@@ -36,6 +36,8 @@ physics: {
             CalorimetryModuleLabel: calo
             SimulationLabel: largeant
             RecoTrackMCMatchLabel: recotrackmcmatching
+            ProtonEnergyLowerBound: 0.075
+            ProtonEnergyUpperBound: 1.0
         }
     }
 
