@@ -213,6 +213,8 @@ class PionAbsorptionSelection : public art::EDFilter {
         bool isWithinReducedVolume(simb::MCParticle *track);
         int lastPointInTPC(simb::MCParticle *track);
         double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed);
+        std::tuple<double, double> computeCurvature(recob::Track track);
+        double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
         void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
 
@@ -231,8 +233,23 @@ class PionAbsorptionSelection : public art::EDFilter {
         double       fVertexRadius;
         double       SmallTrackLength;
         int          MaxSmallTracks;
+        double       MeanCurvatureThreshold;
         float        PROTON_ENERGY_LOWER_BOUND;
         float        PROTON_ENERGY_UPPER_BOUND;
+
+        // Histograms
+        TH1D* hTotalEvents;
+        TH1D* hTotalEventsSignal;
+        TH1D* hWCExists;
+        TH1D* hWCExistsSignal;
+        TH1D* hPionInRedVolume;
+        TH1D* hPionInRedVolumeSignal;
+        TH1D* hNoOutgoingPion;
+        TH1D* hNoOutgoingPionSignal;
+        TH1D* hSmallTracks;
+        TH1D* hSmallTracksSignal;
+        TH1D* hMeanCurvature;
+        TH1D* hMeanCurvatureSignal;
 
         // Cut variables
         double fMeanDEDXThreshold;
@@ -244,13 +261,6 @@ class PionAbsorptionSelection : public art::EDFilter {
         int run;
         int subrun;
         int event;
-
-        // Statistics
-        int totalEventCount = 0;
-        int pionVertexInRedVolEventCount = 0;
-        int WC2TPCTrackBecomesProton = 0;
-        int onlyOutgoingProtonsEventCount = 0;
-        int showerEvents = 0;
 
         // WC variables
         int    WC2TPCtrkID = -99999;
@@ -305,6 +315,10 @@ class PionAbsorptionSelection : public art::EDFilter {
         std::vector<bool>        isProtonStopping;
         std::vector<std::string> protonTrueProcess;
 
+        // Curvature of WC track
+        double WCMeanCurvature;
+        double WCMaxCurvature;
+
         // Masses
         const double PionMass    = .13957018;    // in GeV
         const double ProtonMass  = .93827208816; // in GeV
@@ -333,7 +347,6 @@ PionAbsorptionSelection::PionAbsorptionSelection(fhicl::ParameterSet const &p) :
 
 bool PionAbsorptionSelection::filter(art::Event &e) {
     resetTree();
-    totalEventCount++;
 
     // Get event metadata
     run = e.run(); subrun = e.subRun(); event = e.event();
@@ -475,12 +488,20 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         truthPrimaryDaughtersKE
     );
 
+    // Events before any selection cut
+    hTotalEvents->Fill(0.5);
+    if (isPionAbsorptionSignal) hTotalEventsSignal->Fill(0.5);
+
     //////////////////////
     // Selection algorithm
     //////////////////////
 
     // Check that there is a WC to TPC match, and check if pion stops inside fiducial volume
     if (WC2TPCtrkID != -99999) {
+        // There is WC match
+        hWCExists->Fill(0.5);
+        if (isPionAbsorptionSignal) hWCExistsSignal->Fill(0.5);
+
         // Identify pion among reco tracks
         for (size_t trk_idx = 0; trk_idx < tpcTrackHandle -> size(); ++trk_idx) {
             auto thisTrack = tracklist.at(trk_idx);
@@ -489,6 +510,11 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
 
             // Check if this track matches ID of particle matched to WC (i.e., pion)
             if (thisTrack->ID() == WC2TPCtrkID) {
+                // Get curvature for track
+                auto [meanCurvature, maxCurvature] = computeCurvature(*thisTrack);
+                WCMeanCurvature = meanCurvature;
+                WCMaxCurvature  = maxCurvature;
+
                 // Reverse pion if needed 
                 if ((thisTrack->Start()).Z() < (thisTrack->End()).Z()) {
                     recoWC2TPCBeginning = thisTrack->Start();
@@ -508,13 +534,12 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
                 WC2TPCPionEndZ = recoWC2TPCEnd.Z();
                 WC2TPCPionLength = thisTrack->Length();
 
-                // Check pion track end is inside fiducial volume
+                // Check pion track end is inside reduced volume
                 if (!(isWithinReducedVolume(WC2TPCPionEndX, WC2TPCPionEndY, WC2TPCPionEndZ))) {
                     // We can have cases in which a proton going in the same (or close) direction to the pion 
                     // gets reconstructed as the same track; we identify these events with dE/dx
                     if (meanDEDX(fmcal, thisTrack.key(), isPionReversed) > fMeanDEDXThreshold) {
                         // TODO: do something else with these events?
-                        WC2TPCTrackBecomesProton++;
                     } else {
                         return false;
                     }
@@ -539,6 +564,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
                         wcMatchDaughtersPDG.push_back(part->PdgCode());
                     }
                 }
+                break;
             }
         }
     } // end of WC2TPCtrkID if statement
@@ -548,7 +574,8 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     }
 
     // If we made it here, pion vertex is inside reduced volume
-    pionVertexInRedVolEventCount++;
+    hPionInRedVolume->Fill(0.5);
+    if (isPionAbsorptionSignal) hPionInRedVolumeSignal->Fill(0.5);
 
     // Count small tracks for shower cut
     int numSmallTracks = 0;
@@ -597,9 +624,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
             // Reject events with outgoing pions
             double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed);
             if (thisMeanDEDX < fMeanDEDXThreshold) {
-                // TODO: keep track of these events somewhere?
                 // TODO: pion stitching?
-                // TODO: do something different btw stopping and non-stopping protons?
                 return false;
             }
 
@@ -633,14 +658,23 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         } // end if track begins or ends near pion
     } // end loop over tracks near pion
 
+    // At this point, found event with no outgoing pions
+    hNoOutgoingPion->Fill(0.5);
+    if (isPionAbsorptionSignal) hNoOutgoingPionSignal->Fill(0.5);
+
     // Shower cut
     if (numSmallTracks > MaxSmallTracks) {
-        showerEvents++;
         return false;
     }
+    hSmallTracks->Fill(0.5);
+    if (isPionAbsorptionSignal) hSmallTracksSignal->Fill(0.5);
 
-    // We found an event with only outgoing protons (near pion vertex)
-    onlyOutgoingProtonsEventCount++;
+    // Curvature cut
+    if (WCMeanCurvature > MeanCurvatureThreshold) {
+        return false;
+    }
+    hMeanCurvature->Fill(0.5);
+    if (isPionAbsorptionSignal) hMeanCurvatureSignal->Fill(0.5);
 
     // If we got to here, we passed all selection criteria
     if (bVerbose) std::cout << "Found pion absorption event with:"  << std::endl;
@@ -664,6 +698,7 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     fVertexRadius                      = p.get<double>("VertexRadius", 4);
     SmallTrackLength                   = p.get<double>("SmallTrackLength", 35);
     MaxSmallTracks                     = p.get<int>("MaxSmallTracks", 5);
+    MeanCurvatureThreshold             = p.get<double>("MeanCurvatureThreshold", 0.015);
     PROTON_ENERGY_LOWER_BOUND          = p.get<float>("ProtonEnergyLowerBound", 0.075);
     PROTON_ENERGY_UPPER_BOUND          = p.get<float>("ProtonEnergyUpperBound", 1.0);
 }
@@ -673,6 +708,19 @@ void PionAbsorptionSelection::beginJob() {
     art::ServiceHandle<art::TFileService> tfs;
 
     // Make histograms and tree branches
+    hTotalEvents           = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", 1, 0, 1);
+    hTotalEventsSignal     = tfs->make<TH1D>("hTotalEventsSignal", "hTotalEventsSignal", 1, 0, 1);
+    hWCExists              = tfs->make<TH1D>("hWCExists", "hWCExists", 1, 0, 1);
+    hWCExistsSignal        = tfs->make<TH1D>("hWCExistsSignal", "hWCExistsSignal", 1, 0, 1);
+    hPionInRedVolume       = tfs->make<TH1D>("hPionInRedVolume", "hPionInRedVolume", 1, 0, 1);
+    hPionInRedVolumeSignal = tfs->make<TH1D>("hPionInRedVolumeSignal", "hPionInRedVolumeSignal", 1, 0, 1);
+    hNoOutgoingPion        = tfs->make<TH1D>("hNoOutgoingPion", "hNoOutgoingPion", 1, 0, 1);
+    hNoOutgoingPionSignal  = tfs->make<TH1D>("hNoOutgoingPionSignal", "hNoOutgoingPionSignal", 1, 0, 1);
+    hSmallTracks           = tfs->make<TH1D>("hSmallTracks", "hSmallTracks", 1, 0, 1);
+    hSmallTracksSignal     = tfs->make<TH1D>("hSmallTracksSignal", "hSmallTracksSignal", 1, 0, 1); 
+    hMeanCurvature         = tfs->make<TH1D>("hMeanCurvature", "hMeanCurvature", 1, 0, 1);
+    hMeanCurvatureSignal   = tfs->make<TH1D>("hMeanCurvatureSignal", "hMeanCurvatureSignal", 1, 0, 1);
+
     PionAbsTree = tfs->make<TTree>("PionAbsorptionSelectionTree", "PionAbsorptionSelectionTree");
 
     PionAbsTree->Branch("Run", &run, "run/I");
@@ -695,12 +743,6 @@ void PionAbsorptionSelection::beginJob() {
 
     PionAbsTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
     PionAbsTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
-
-    PionAbsTree->Branch("totalEventCount", &totalEventCount, "totalEventCount/I");
-    PionAbsTree->Branch("pionVertexInRedVolEventCount", &pionVertexInRedVolEventCount, "pionVertexInRedVolEventCount/I");
-    PionAbsTree->Branch("WC2TPCTrackBecomesProton", &WC2TPCTrackBecomesProton, "WC2TPCTrackBecomesProton/I");
-    PionAbsTree->Branch("onlyOutgoingProtonsEventCount", &onlyOutgoingProtonsEventCount, "onlyOutgoingProtonsEventCount/I");
-    PionAbsTree->Branch("showerEvents", &showerEvents, "showerEvents/I");
 
     PionAbsTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
     PionAbsTree->Branch("WC2TPCPionBeginX", &WC2TPCPionBeginX, "WC2TPCPionBeginX/D");
@@ -726,10 +768,30 @@ void PionAbsorptionSelection::beginJob() {
 }
 
 void PionAbsorptionSelection::endJob() {
+    int totalSignalEvents = hTotalEventsSignal->Integral();
     std::cout << "Cut statistics:" << std::endl;
-    std::cout << "Total event count: " << totalEventCount << std::endl;
-    std::cout << "Events with pion vertex in fiducial volume: " << pionVertexInRedVolEventCount << std::endl;
-    std::cout << "Events with only protons coming out of vertex: " << onlyOutgoingProtonsEventCount << std::endl;
+    std::cout << "  Total events: " << hTotalEvents->Integral() << std::endl;
+    std::cout << "  Total signal events: " << totalSignalEvents << std::endl;
+    std::cout << std::endl;
+    std::cout << "  WC to TPC match exists total events: " << hWCExists->Integral() << std::endl;
+    std::cout << "  WC to TPC match exists signal events: " << hWCExistsSignal->Integral() << std::endl;
+    std::cout << "  WC cut purity: " << hWCExistsSignal->Integral() / hWCExists->Integral() << " and efficiency: " << hWCExistsSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << std::endl;
+    std::cout << "  Pion in red. volume total events: " << hPionInRedVolume->Integral() << std::endl;
+    std::cout << "  Pion in red. volume signal events: " << hPionInRedVolumeSignal->Integral() << std::endl;
+    std::cout << "  Pion in red. volume cut purity: " << hPionInRedVolumeSignal->Integral() / hPionInRedVolume->Integral() << " and efficiency: " << hPionInRedVolumeSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << std::endl;
+    std::cout << "  No outgoing pion total events: " << hNoOutgoingPion->Integral() << std::endl;
+    std::cout << "  No outgoing pion signal events: " << hNoOutgoingPionSignal->Integral() << std::endl;
+    std::cout << "  No outgoing pion cut purity: " << hNoOutgoingPionSignal->Integral() / hNoOutgoingPion->Integral() << " and efficiency: " << hNoOutgoingPionSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << std::endl;
+    std::cout << "  No small tracks total events: " << hSmallTracks->Integral() << std::endl;
+    std::cout << "  No small tracks signal events: " << hSmallTracksSignal->Integral() << std::endl;
+    std::cout << "  No small tracks cut purity: " << hSmallTracksSignal->Integral() / hSmallTracks->Integral() << " and efficiency: " << hSmallTracksSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << std::endl;
+    std::cout << "  Small track curvature total events: " << hMeanCurvature->Integral() << std::endl;
+    std::cout << "  Small track curvature signal events: " << hMeanCurvatureSignal->Integral() << std::endl;
+    std::cout << "  Small track curvature cut purity: " << hMeanCurvatureSignal->Integral() / hMeanCurvature->Integral() << " and efficiency: " << hMeanCurvatureSignal->Integral() / totalSignalEvents << std::endl;
 }
 
 void PionAbsorptionSelection::resetTree() {
@@ -797,6 +859,48 @@ void PionAbsorptionSelection::fillSignalInformation(
     isPionAbsorptionSignal = true;
     return;
 }
+
+std::tuple<double, double> PionAbsorptionSelection::computeCurvature(recob::Track track) {
+    double meanCurvature = 0;
+    double maxCurvature  = 0;
+    for (size_t iPoint = 0; iPoint < track.NPoints() - 2; iPoint++) {
+        recob::TrackTrajectory::Point_t p1_ = track.LocationAtPoint(iPoint);
+        recob::TrackTrajectory::Point_t p2_ = track.LocationAtPoint(iPoint + 1);
+        recob::TrackTrajectory::Point_t p3_ = track.LocationAtPoint(iPoint + 2);
+        TVector3 p1, p2, p3;
+        p1(0) = p1_.X(); p1(1) = p1_.Y(); p1(2) = p1_.Z();
+        p2(0) = p2_.X(); p2(1) = p2_.Y(); p2(2) = p2_.Z();
+        p3(0) = p3_.X(); p3(1) = p3_.Y(); p3(2) = p3_.Z();
+  
+        double curvatureAtPoint = curvatureForThreePoints(p1, p2, p3);
+        meanCurvature += curvatureAtPoint / (track.NPoints() - 2);
+        if (curvatureAtPoint > maxCurvature) maxCurvature = curvatureAtPoint;
+    }
+  
+    return std::make_tuple(meanCurvature, maxCurvature);
+}
+
+double PionAbsorptionSelection::curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3) {
+    // From: https://en.wikipedia.org/wiki/Circumcircle#Cartesian_coordinates_from_cross-_and_dot-products 
+  
+    // Edges of a triangle
+    TVector3 t = p1 - p2;
+    TVector3 u = p3 - p1;
+    TVector3 v = p2 - p3;
+  
+    // Normal to the triangle
+    TVector3 w = t.Cross(v);
+  
+    double tt = TMath::Sqrt(t * t);
+    double uu = TMath::Sqrt(u * u);
+    double vv = TMath::Sqrt(v * v);
+    double ww = TMath::Sqrt(w * w);
+  
+    // If area of triangle is too small, no curvature
+    if (ww < 10e-14) return 0;
+  
+    return (2 * ww) / (tt * uu * vv);
+  }
 
 double PionAbsorptionSelection::meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed) {
     // Temporary storage for this reco track

@@ -651,49 +651,6 @@ bool ShowerRecoEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim:
 }
 
 std::tuple<double, double> ShowerRecoEval::computeCurvature(recob::Track track) {
-  // // Largest distance from arc
-
-  // // First, we get the first and last point
-  // recob::TrackTrajectory::Point_t firstPoint = track.Start();
-  // recob::TrackTrajectory::Point_t lastPoint = track.End();
-
-  // // Compute line
-  // TVectorD a(3); TVectorD n(3);
-  // a(0) = firstPoint.X(); a(1) = firstPoint.Y(); a(2) = firstPoint.Z();
-  // n(0) = lastPoint.X() - firstPoint.X();
-  // n(1) = lastPoint.Y() - firstPoint.Y();
-  // n(2) = lastPoint.Z() - firstPoint.Z();
-  // TVectorD n_unit = n * (1 / sqrt(n.Norm2Sqr()));
-
-  // // Find largest distance
-  // double distance = 0;
-  // for (size_t iPoint = 0; iPoint < track.NPoints(); iPoint++) {
-  //   recob::TrackTrajectory::Point_t currentPoint = track.LocationAtPoint(iPoint);
-  //   TVectorD p(3);
-  //   p(0) = currentPoint.X(); p(1) = currentPoint.Y(); p(2) = currentPoint.Z();
-  //   TVectorD distanceVector = (a - p) - n_unit * ((a - p) * n_unit);
-  //   double tempDistance = sqrt(distanceVector.Norm2Sqr());
-  //   if (tempDistance > distance) distance = tempDistance;
-  // }
-
-  // return distance;
-
-  // // Comparing track length to distance between first and last point
-  
-  // // First, we get the first and last point
-  // recob::TrackTrajectory::Point_t firstPoint = track.Start();
-  // recob::TrackTrajectory::Point_t lastPoint = track.End();
-
-  // double firstToLast = sqrt(
-  //   pow(firstPoint.X() - lastPoint.X(), 2) + 
-  //   pow(firstPoint.Y() - lastPoint.Y(), 2) + 
-  //   pow(firstPoint.Z() - lastPoint.Z(), 2)
-  // );
-
-  // return TMath::Abs(track.Length() - firstToLast);
-
-  // Compute curvature for every three contiguous points
-  
   double meanCurvature = 0;
   double maxCurvature  = 0;
   for (size_t iPoint = 0; iPoint < track.NPoints() - 2; iPoint++) {

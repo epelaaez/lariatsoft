@@ -40,6 +40,7 @@ physics: {
             VertexRadius:           4
             SmallTrackLength:       35
             MaxSmallTracks:         5
+            MeanCurvatureThreshold: 0.015
             ProtonEnergyLowerBound: 0.075
             ProtonEnergyUpperBound: 1.0
         }
