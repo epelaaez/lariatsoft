@@ -547,7 +547,7 @@ void RecoEval::analyze(art::Event const &e) {
     if (bVerbose) std::cout << std::endl;
 
     // Get relevant pion truth information
-    fillPionTruthData(primaryPion); 
+    fillPionTruthData(primaryPion);
     fillProtonDaughtersTruthData(daughterProtons);
 
     // Ignore pions not in TPC, should not be needed since in our pion 
@@ -1165,7 +1165,7 @@ void RecoEval::reconfigure(fhicl::ParameterSet const & p) {
     strCalorimetryModuleLabel          = p.get<std::string>("CalorimetryModuleLabel", "calo");
     simulation_producer_label_         = p.get<std::string>("SimulationLabel", "largeant");
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
-    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 60);
+    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
     TrackStitchingThreshold            = p.get<double> ("TrackStitchingThreshold",4);
 }
 

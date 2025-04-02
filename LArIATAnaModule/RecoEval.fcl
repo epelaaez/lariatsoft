@@ -36,6 +36,7 @@ physics: {
             CalorimetryModuleLabel: calo
             SimulationLabel: largeant
             RecoTrackMCMatchLabel: recotrackmcmatching
+            MeanDEDXNumberTrajPoints: 20
         }
     }
 
