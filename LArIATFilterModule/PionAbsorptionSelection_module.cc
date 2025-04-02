@@ -239,17 +239,26 @@ class PionAbsorptionSelection : public art::EDFilter {
 
         // Histograms
         TH1D* hTotalEvents;
-        TH1D* hTotalEventsSignal;
+        TH1D* hTotalEvents0pSignal;
+        TH1D* hTotalEventsNpSignal;
         TH1D* hWCExists;
-        TH1D* hWCExistsSignal;
+        TH1D* hWCExists0pSignal;
+        TH1D* hWCExistsNpSignal;
         TH1D* hPionInRedVolume;
-        TH1D* hPionInRedVolumeSignal;
+        TH1D* hPionInRedVolume0pSignal;
+        TH1D* hPionInRedVolumeNpSignal;
+
+        // For this, filling with 0.5 indicates 0p reco event
+        // and filling with 1.5 indicates Np reco event
         TH1D* hNoOutgoingPion;
-        TH1D* hNoOutgoingPionSignal;
+        TH1D* hNoOutgoingPion0pSignal;
+        TH1D* hNoOutgoingPionNpSignal;
         TH1D* hSmallTracks;
-        TH1D* hSmallTracksSignal;
+        TH1D* hSmallTracks0pSignal;
+        TH1D* hSmallTracksNpSignal;
         TH1D* hMeanCurvature;
-        TH1D* hMeanCurvatureSignal;
+        TH1D* hMeanCurvature0pSignal;
+        TH1D* hMeanCurvatureNpSignal;
 
         // Cut variables
         double fMeanDEDXThreshold;
@@ -353,7 +362,65 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (bVerbose) std::cout << "Run: " << run << ", subrun: " << subrun << ", event: " << event << std::endl;
     if (bVerbose) std::cout << std::endl;
 
-    // First, we get all the data products we are going to need to make cuts
+    //////////////
+    // Get MC data
+    //////////////
+
+    // Get simulated particles
+    auto particle_handle = e.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
+    std::vector<art::Ptr<simb::MCParticle>> particle_vector;
+    art::fill_ptr_vector(particle_vector, particle_handle);
+
+    // Get particle list
+    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    const sim::ParticleList& plist = pi_serv->ParticleList();
+
+    // Initialize particle map and fill it
+    ParticleMap particle_map; 
+    for (auto const& particle : particle_vector) {
+        particle_map[particle->TrackId()] = particle;
+    }
+
+    // Identify true-level primary pion and get its information
+    std::vector<int> primaryDaughtersIDs;
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (part->Process() == "primary") {
+            truthPrimaryPDG = part->PdgCode();
+            for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
+            truthPrimaryVertexX = part->EndX();
+            truthPrimaryVertexY = part->EndY();
+            truthPrimaryVertexZ = part->EndZ(); 
+            break;
+        }
+    }
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
+            truthPrimaryDaughtersProcess.push_back(part->Process());
+            truthPrimaryDaughtersPDG.push_back(part->PdgCode());
+            truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
+        }
+    }
+
+    fillSignalInformation(
+        truthPrimaryPDG, 
+        truthPrimaryVertexX,
+        truthPrimaryVertexY,
+        truthPrimaryVertexZ,
+        truthPrimaryDaughtersPDG,
+        truthPrimaryDaughtersProcess,
+        truthPrimaryDaughtersKE
+    );
+
+    // Events before any selection cut
+    hTotalEvents->Fill(0.5);
+    if (isPionAbsorptionSignal) {
+        if (numVisibleProtons == 0) hTotalEvents0pSignal->Fill(0.5);
+        if (numVisibleProtons > 0)  hTotalEventsNpSignal->Fill(0.5);
+    }
+
+    // First, we get all the reco data products we are going to need to make cuts
 
     //////////////////////
     // Wire chamber tracks
@@ -402,6 +469,10 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (bVerbose) std::cout << "Number of TPC reco tracks: " << numTracksReco << std::endl;
     if (bVerbose) std::cout << std::endl;
 
+    // Get MCParticles from tracks
+    const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
+        find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
+
     //////////////////
     // WC2TPC Matching
     //////////////////
@@ -437,61 +508,6 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     // Define calorimetry
     art::FindManyP<anab::Calorimetry> fmcal(tpcTrackHandle, e, strCalorimetryModuleLabel);
 
-    // Get simulated particles
-    auto particle_handle = e.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
-    std::vector<art::Ptr<simb::MCParticle>> particle_vector;
-    art::fill_ptr_vector(particle_vector, particle_handle);
-
-    // Get particle list
-    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-    const sim::ParticleList& plist = pi_serv->ParticleList();
-
-    // Initialize particle map and fill it
-    ParticleMap particle_map; 
-    for (auto const& particle : particle_vector) {
-        particle_map[particle->TrackId()] = particle;
-    }
-
-    // Get MCParticles from tracks
-    const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
-        find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
-
-    // Identify true-level primary pion and get its information
-    std::vector<int> primaryDaughtersIDs;
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto part = plist.Particle(p);
-        if (part->Process() == "primary") {
-            truthPrimaryPDG = part->PdgCode();
-            for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
-            truthPrimaryVertexX = part->EndX();
-            truthPrimaryVertexY = part->EndY();
-            truthPrimaryVertexZ = part->EndZ(); 
-            break;
-        }
-    }
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto part = plist.Particle(p);
-        if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
-            truthPrimaryDaughtersProcess.push_back(part->Process());
-            truthPrimaryDaughtersPDG.push_back(part->PdgCode());
-            truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
-        }
-    }
-
-    fillSignalInformation(
-        truthPrimaryPDG, 
-        truthPrimaryVertexX,
-        truthPrimaryVertexY,
-        truthPrimaryVertexZ,
-        truthPrimaryDaughtersPDG,
-        truthPrimaryDaughtersProcess,
-        truthPrimaryDaughtersKE
-    );
-
-    // Events before any selection cut
-    hTotalEvents->Fill(0.5);
-    if (isPionAbsorptionSignal) hTotalEventsSignal->Fill(0.5);
-
     //////////////////////
     // Selection algorithm
     //////////////////////
@@ -500,7 +516,10 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (WC2TPCtrkID != -99999) {
         // There is WC match
         hWCExists->Fill(0.5);
-        if (isPionAbsorptionSignal) hWCExistsSignal->Fill(0.5);
+        if (isPionAbsorptionSignal) {
+            if (numVisibleProtons == 0) hWCExists0pSignal->Fill(0.5);
+            if (numVisibleProtons > 0)  hWCExistsNpSignal->Fill(0.5);
+        }
 
         // Identify pion among reco tracks
         for (size_t trk_idx = 0; trk_idx < tpcTrackHandle -> size(); ++trk_idx) {
@@ -575,7 +594,10 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
 
     // If we made it here, pion vertex is inside reduced volume
     hPionInRedVolume->Fill(0.5);
-    if (isPionAbsorptionSignal) hPionInRedVolumeSignal->Fill(0.5);
+    if (isPionAbsorptionSignal) {
+        if (numVisibleProtons == 0) hPionInRedVolume0pSignal->Fill(0.5);
+        if (numVisibleProtons > 0)  hPionInRedVolumeNpSignal->Fill(0.5);
+    }
 
     // Count small tracks for shower cut
     int numSmallTracks = 0;
@@ -660,21 +682,36 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
 
     // At this point, found event with no outgoing pions
     hNoOutgoingPion->Fill(0.5);
-    if (isPionAbsorptionSignal) hNoOutgoingPionSignal->Fill(0.5);
+    if (isPionAbsorptionSignal) {
+        if ((numVisibleProtons == 0) && (protonCount == 0)) hNoOutgoingPion0pSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  hNoOutgoingPion0pSignal->Fill(1.5);
+        if ((numVisibleProtons > 0) && (protonCount == 0))  hNoOutgoingPionNpSignal->Fill(0.5);
+        if ((numVisibleProtons > 0) && (protonCount > 0))   hNoOutgoingPionNpSignal->Fill(1.5);
+    }
 
     // Shower cut
     if (numSmallTracks > MaxSmallTracks) {
         return false;
     }
     hSmallTracks->Fill(0.5);
-    if (isPionAbsorptionSignal) hSmallTracksSignal->Fill(0.5);
+    if (isPionAbsorptionSignal) {
+        if ((numVisibleProtons == 0) && (protonCount == 0)) hSmallTracks0pSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  hSmallTracks0pSignal->Fill(1.5);
+        if ((numVisibleProtons > 0) && (protonCount == 0))  hSmallTracksNpSignal->Fill(0.5);
+        if ((numVisibleProtons > 0) && (protonCount > 0))   hSmallTracksNpSignal->Fill(1.5);
+    }
 
     // Curvature cut
     if (WCMeanCurvature > MeanCurvatureThreshold) {
         return false;
     }
     hMeanCurvature->Fill(0.5);
-    if (isPionAbsorptionSignal) hMeanCurvatureSignal->Fill(0.5);
+    if (isPionAbsorptionSignal) {
+        if ((numVisibleProtons == 0) && (protonCount == 0)) hMeanCurvature0pSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  hMeanCurvature0pSignal->Fill(1.5);
+        if ((numVisibleProtons > 0) && (protonCount == 0))  hMeanCurvatureNpSignal->Fill(0.5);
+        if ((numVisibleProtons > 0) && (protonCount > 0))   hMeanCurvatureNpSignal->Fill(1.5);
+    }
 
     // If we got to here, we passed all selection criteria
     if (bVerbose) std::cout << "Found pion absorption event with:"  << std::endl;
@@ -693,8 +730,8 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     simulation_producer_label_         = p.get<std::string>("SimulationLabel", "largeant");
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
 
-    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 60);
-    fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 3.4);
+    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
+    fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 4.0);
     fVertexRadius                      = p.get<double>("VertexRadius", 4);
     SmallTrackLength                   = p.get<double>("SmallTrackLength", 35);
     MaxSmallTracks                     = p.get<int>("MaxSmallTracks", 5);
@@ -708,18 +745,24 @@ void PionAbsorptionSelection::beginJob() {
     art::ServiceHandle<art::TFileService> tfs;
 
     // Make histograms and tree branches
-    hTotalEvents           = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", 1, 0, 1);
-    hTotalEventsSignal     = tfs->make<TH1D>("hTotalEventsSignal", "hTotalEventsSignal", 1, 0, 1);
-    hWCExists              = tfs->make<TH1D>("hWCExists", "hWCExists", 1, 0, 1);
-    hWCExistsSignal        = tfs->make<TH1D>("hWCExistsSignal", "hWCExistsSignal", 1, 0, 1);
-    hPionInRedVolume       = tfs->make<TH1D>("hPionInRedVolume", "hPionInRedVolume", 1, 0, 1);
-    hPionInRedVolumeSignal = tfs->make<TH1D>("hPionInRedVolumeSignal", "hPionInRedVolumeSignal", 1, 0, 1);
-    hNoOutgoingPion        = tfs->make<TH1D>("hNoOutgoingPion", "hNoOutgoingPion", 1, 0, 1);
-    hNoOutgoingPionSignal  = tfs->make<TH1D>("hNoOutgoingPionSignal", "hNoOutgoingPionSignal", 1, 0, 1);
-    hSmallTracks           = tfs->make<TH1D>("hSmallTracks", "hSmallTracks", 1, 0, 1);
-    hSmallTracksSignal     = tfs->make<TH1D>("hSmallTracksSignal", "hSmallTracksSignal", 1, 0, 1); 
-    hMeanCurvature         = tfs->make<TH1D>("hMeanCurvature", "hMeanCurvature", 1, 0, 1);
-    hMeanCurvatureSignal   = tfs->make<TH1D>("hMeanCurvatureSignal", "hMeanCurvatureSignal", 1, 0, 1);
+    hTotalEvents             = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", 1, 0, 1);
+    hTotalEvents0pSignal     = tfs->make<TH1D>("hTotalEvents0pSignal", "hTotalEvents0pSignal", 1, 0, 1);
+    hTotalEventsNpSignal     = tfs->make<TH1D>("hTotalEventsNpSignal", "hTotalEventsNpSignal", 1, 0, 1);
+    hWCExists                = tfs->make<TH1D>("hWCExists", "hWCExists", 1, 0, 1);
+    hWCExists0pSignal        = tfs->make<TH1D>("hWCExists0pSignal", "hWCExists0pSignal", 1, 0, 1);
+    hWCExistsNpSignal        = tfs->make<TH1D>("hWCExistsNpSignal", "hWCExistsNpSignal", 1, 0, 1);
+    hPionInRedVolume         = tfs->make<TH1D>("hPionInRedVolume", "hPionInRedVolume", 1, 0, 1);
+    hPionInRedVolume0pSignal = tfs->make<TH1D>("hPionInRedVolume0pSignal", "hPionInRedVolume0pSignal", 1, 0, 1);
+    hPionInRedVolumeNpSignal = tfs->make<TH1D>("hPionInRedVolumeNpSignal", "hPionInRedVolumeNpSignal", 1, 0, 1);
+    hNoOutgoingPion          = tfs->make<TH1D>("hNoOutgoingPion", "hNoOutgoingPion", 2, 0, 2);
+    hNoOutgoingPion0pSignal  = tfs->make<TH1D>("hNoOutgoingPion0pSignal", "hNoOutgoingPion0pSignal", 2, 0, 2);
+    hNoOutgoingPionNpSignal  = tfs->make<TH1D>("hNoOutgoingPionNpSignal", "hNoOutgoingPionNpSignal", 2, 0, 2);
+    hSmallTracks             = tfs->make<TH1D>("hSmallTracks", "hSmallTracks", 2, 0, 2);
+    hSmallTracks0pSignal     = tfs->make<TH1D>("hSmallTracks0pSignal", "hSmallTracks0pSignal", 2, 0, 2); 
+    hSmallTracksNpSignal     = tfs->make<TH1D>("hSmallTracksNpSignal", "hSmallTracksNpSignal", 2, 0, 2); 
+    hMeanCurvature           = tfs->make<TH1D>("hMeanCurvature", "hMeanCurvature", 2, 0, 2);
+    hMeanCurvature0pSignal   = tfs->make<TH1D>("hMeanCurvature0pSignal", "hMeanCurvature0pSignal", 2, 0, 2);
+    hMeanCurvatureNpSignal   = tfs->make<TH1D>("hMeanCurvatureNpSignal", "hMeanCurvatureNpSignal", 2, 0, 2);
 
     PionAbsTree = tfs->make<TTree>("PionAbsorptionSelectionTree", "PionAbsorptionSelectionTree");
 
@@ -768,30 +811,48 @@ void PionAbsorptionSelection::beginJob() {
 }
 
 void PionAbsorptionSelection::endJob() {
-    int totalSignalEvents = hTotalEventsSignal->Integral();
+    int total0pSignalEvents = hTotalEvents0pSignal->Integral();
+    int totalNpSignalEvents = hTotalEventsNpSignal->Integral();
+    int totalSignalEvents   = total0pSignalEvents + totalNpSignalEvents;
     std::cout << "Cut statistics:" << std::endl;
     std::cout << "  Total events: " << hTotalEvents->Integral() << std::endl;
-    std::cout << "  Total signal events: " << totalSignalEvents << std::endl;
+    std::cout << "  Total 0p signal events: " << total0pSignalEvents << std::endl;
+    std::cout << "  Total Np signal events: " << totalNpSignalEvents << std::endl;
     std::cout << std::endl;
     std::cout << "  WC to TPC match exists total events: " << hWCExists->Integral() << std::endl;
-    std::cout << "  WC to TPC match exists signal events: " << hWCExistsSignal->Integral() << std::endl;
-    std::cout << "  WC cut purity: " << hWCExistsSignal->Integral() / hWCExists->Integral() << " and efficiency: " << hWCExistsSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << "  WC to TPC match exists 0p signal events: " << hWCExists0pSignal->Integral() << std::endl;
+    std::cout << "  WC to TPC match exists Np signal events: " << hWCExistsNpSignal->Integral() << std::endl;
+    std::cout << "  WC cut overall purity: " << (hWCExists0pSignal->Integral() + hWCExistsNpSignal->Integral()) / hWCExists->Integral() << " and efficiency: " << (hWCExists0pSignal->Integral() + hWCExistsNpSignal->Integral()) / totalSignalEvents << std::endl;
     std::cout << std::endl;
     std::cout << "  Pion in red. volume total events: " << hPionInRedVolume->Integral() << std::endl;
-    std::cout << "  Pion in red. volume signal events: " << hPionInRedVolumeSignal->Integral() << std::endl;
-    std::cout << "  Pion in red. volume cut purity: " << hPionInRedVolumeSignal->Integral() / hPionInRedVolume->Integral() << " and efficiency: " << hPionInRedVolumeSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << "  Pion in red. volume 0p signal events: " << hPionInRedVolume0pSignal->Integral() << std::endl;
+    std::cout << "  Pion in red. volume Np signal events: " << hPionInRedVolumeNpSignal->Integral() << std::endl;
+    std::cout << "  Pion in red. volume cut overall purity: " << (hPionInRedVolume0pSignal->Integral() + hPionInRedVolumeNpSignal->Integral()) / hPionInRedVolume->Integral() << " and efficiency: " << (hPionInRedVolume0pSignal->Integral() + hPionInRedVolumeNpSignal->Integral()) / totalSignalEvents << std::endl;
     std::cout << std::endl;
-    std::cout << "  No outgoing pion total events: " << hNoOutgoingPion->Integral() << std::endl;
-    std::cout << "  No outgoing pion signal events: " << hNoOutgoingPionSignal->Integral() << std::endl;
-    std::cout << "  No outgoing pion cut purity: " << hNoOutgoingPionSignal->Integral() / hNoOutgoingPion->Integral() << " and efficiency: " << hNoOutgoingPionSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << "  No outgoing pion total reco events: " << hNoOutgoingPion->Integral() << std::endl;
+    std::cout << "  No outgoing pion total reco 0p events: " << hNoOutgoingPion->Integral(0, 1) << std::endl;
+    std::cout << "  No outgoing pion 0p signal events: " << hNoOutgoingPion0pSignal->Integral() << std::endl;
+    std::cout << "  No outgoing pion cut 0p purity: " << hNoOutgoingPion0pSignal->Integral(0, 1) / hNoOutgoingPion->Integral(0,1) << " and efficiency: " << hNoOutgoingPion0pSignal->Integral(0, 1) / total0pSignalEvents << std::endl;
+    std::cout << "  No outgoing pion total reco Np events: " << hNoOutgoingPion->Integral(1, 2) << std::endl;
+    std::cout << "  No outgoing pion Np signal events: " << hNoOutgoingPionNpSignal->Integral(1, 2) << std::endl;
+    std::cout << "  No outgoing pion cut Np purity: " << hNoOutgoingPionNpSignal->Integral(1, 2) / hNoOutgoingPion->Integral(1,2) << " and efficiency: " << hNoOutgoingPionNpSignal->Integral(1, 2) / totalNpSignalEvents << std::endl;
     std::cout << std::endl;
-    std::cout << "  No small tracks total events: " << hSmallTracks->Integral() << std::endl;
-    std::cout << "  No small tracks signal events: " << hSmallTracksSignal->Integral() << std::endl;
-    std::cout << "  No small tracks cut purity: " << hSmallTracksSignal->Integral() / hSmallTracks->Integral() << " and efficiency: " << hSmallTracksSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << "  No small tracks total reco events: " << hSmallTracks->Integral() << std::endl;
+    std::cout << "  No small tracks total reco 0p events: " << hSmallTracks->Integral(0, 1) << std::endl;
+    std::cout << "  No small tracks 0p signal events: " << hSmallTracks0pSignal->Integral() << std::endl;
+    std::cout << "  No small tracks cut 0p purity: " << hSmallTracks0pSignal->Integral(0, 1) / hSmallTracks->Integral(0, 1) << " and efficiency: " << hSmallTracks0pSignal->Integral(0, 1) / total0pSignalEvents << std::endl;
+    std::cout << "  No small tracks total reco Np events: " << hSmallTracks->Integral(1, 2) << std::endl;
+    std::cout << "  No small tracks Np signal events: " << hSmallTracksNpSignal->Integral() << std::endl;
+    std::cout << "  No small tracks cut Np purity: " << hSmallTracksNpSignal->Integral(1, 2) / hSmallTracks->Integral(1, 2) << " and efficiency: " << hSmallTracksNpSignal->Integral(1, 2) / totalNpSignalEvents << std::endl;
     std::cout << std::endl;
-    std::cout << "  Small track curvature total events: " << hMeanCurvature->Integral() << std::endl;
-    std::cout << "  Small track curvature signal events: " << hMeanCurvatureSignal->Integral() << std::endl;
-    std::cout << "  Small track curvature cut purity: " << hMeanCurvatureSignal->Integral() / hMeanCurvature->Integral() << " and efficiency: " << hMeanCurvatureSignal->Integral() / totalSignalEvents << std::endl;
+    std::cout << "  Small track curvature total reco events: " << hMeanCurvature->Integral() << std::endl;
+    std::cout << "  Small track curvature total reco 0p events: " << hMeanCurvature->Integral(0, 1) << std::endl;
+    std::cout << "  Small track curvature 0p signal events: " << hMeanCurvature0pSignal->Integral() << std::endl;
+    std::cout << "  Small track curvature cut 0p purity: " << hMeanCurvature0pSignal->Integral(0, 1) / hMeanCurvature->Integral(0, 1) << " and efficiency: " << hMeanCurvature0pSignal->Integral(0, 1) / total0pSignalEvents << std::endl;
+    std::cout << "  Small track curvature total reco Np events: " << hMeanCurvature->Integral(1, 2) << std::endl;
+    std::cout << "  Small track curvature Np signal events: " << hMeanCurvatureNpSignal->Integral() << std::endl;
+    std::cout << "  Small track curvature cut Np purity: " << hMeanCurvatureNpSignal->Integral(1, 2) / hMeanCurvature->Integral(1, 2) << " and efficiency: " << hMeanCurvatureNpSignal->Integral(1, 2) / totalNpSignalEvents << std::endl;
+    std::cout << std::endl;
 }
 
 void PionAbsorptionSelection::resetTree() {
@@ -944,7 +1005,6 @@ double PionAbsorptionSelection::meanDEDX(art::FindManyP<anab::Calorimetry> fmcal
         } // end loop over planes
     }
 
-    // TODO: take meanDEDX over last/first track points, currently doing over whole track
     // Compute and save mean dedx
     double meanDEDX = 0;
     unsigned int bound = 0;

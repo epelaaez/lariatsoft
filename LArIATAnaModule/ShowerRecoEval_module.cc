@@ -236,6 +236,9 @@ class ShowerRecoEval : public art::EDAnalyzer {
         std::string simulation_producer_label_;
         std::string recotrackmcparticlematching_label_;
 
+        // File for saving event data
+        std::ofstream outFile;
+
         // fcl parameters
         bool bVerbose;
         unsigned int MeanDEDXNumberTrajPoints;
@@ -311,6 +314,10 @@ void ShowerRecoEval::analyze(art::Event const &e) {
     resetTree();
 
     run = e.run(); subrun = e.subRun(); event = e.event();
+
+    if (event == 200004) {
+      outFile << "Event: " << event << std::endl;
+    }
 
     if (bVerbose) std::cout << "Run: " << run << ", subrun: " << subrun << ", event: " << event << std::endl;
     if (bVerbose) std::cout << std::endl;
@@ -518,6 +525,16 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         recoLength.push_back(thisTrackLength);
         recoTrkID.push_back(thisTrack->ID());
 
+        if (event == 200004) {
+          outFile << "Starting new reco track:" << std::endl;
+          outFile << "    Start X: " << recoBeginning.X() << std::endl;
+          outFile << "    Start Y: " << recoBeginning.Y() << std::endl;
+          outFile << "    Start Z: " << recoBeginning.Z() << std::endl;
+          outFile << "    End X: " << recoEnd.X() << std::endl;
+          outFile << "    End Y: " << recoEnd.Y() << std::endl;
+          outFile << "    End Z: " << recoEnd.Z() << std::endl;
+          outFile << "    Length: " << thisTrackLength << std::endl;
+        }
         // If reco track is not matched to anything, continue
         if (btdata_vector.size() == 0) continue;
 
@@ -527,6 +544,13 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         int const g4_trk_id  = particle->TrackId();
         std::string process  = particle->Process();
 
+        if (event == 200004) {
+          outFile << "  Truth match info:" << std::endl;
+          outFile << "    PDG: " << pdg_code << std::endl;
+          outFile << "    Process: " << process << std::endl;
+          outFile << "    Length: " << trackMagnitude(particle) << std::endl;
+        }
+
         // At this point, we have:
         //     particle: matched MCParticle
         //     thisTrack: reconstructed track
@@ -535,6 +559,11 @@ void ShowerRecoEval::analyze(art::Event const &e) {
         matchedLength.push_back(trackMagnitude(particle));
         matchedTrkID.push_back(g4_trk_id);
         matchedProcess.push_back(process);
+
+        if (event == 200004) {
+          outFile << "Ending track." << std::endl;
+          outFile << std::endl;
+        }
     } // end loop over tracks
 
     if (bVerbose) std::cout << std::endl;
@@ -543,6 +572,7 @@ void ShowerRecoEval::analyze(art::Event const &e) {
 
 void ShowerRecoEval::beginJob() {
     if (bVerbose) std::cout << "Beginning job." << std::endl;
+    outFile.open("Events.txt");
   
     art::ServiceHandle<art::TFileService> tfs;
 

@@ -28,21 +28,22 @@ physics: {
     
     filters: {
         PionAbsorptionSelection: {
-            module_type:            "PionAbsorptionSelection"
-	        Verbose:			    false
-            WCTrackBuilderLabel:    wctrack
-            TPCTrackHandleLabel:    pmtrack
-            WC2TPModuleLabel:       wctracktpctrackmatch
-            CalorimetryModuleLabel: calo
-            SimulationLabel:        largeant 
-            RecoTrackMCMatchLabel:  recotrackmcmatching
-            MeanDEDXThreshold:      3.4
-            VertexRadius:           4
-            SmallTrackLength:       35
-            MaxSmallTracks:         5
-            MeanCurvatureThreshold: 0.015
-            ProtonEnergyLowerBound: 0.075
-            ProtonEnergyUpperBound: 1.0
+            module_type:              "PionAbsorptionSelection"
+	        Verbose:			      false
+            WCTrackBuilderLabel:      wctrack
+            TPCTrackHandleLabel:      pmtrack
+            WC2TPModuleLabel:         wctracktpctrackmatch
+            CalorimetryModuleLabel:   calo
+            SimulationLabel:          largeant 
+            RecoTrackMCMatchLabel:    recotrackmcmatching
+            MeanDEDXNumberTrajPoints: 20
+            MeanDEDXThreshold:        4.0
+            VertexRadius:             4
+            SmallTrackLength:         35
+            MaxSmallTracks:           5
+            MeanCurvatureThreshold:   0.015
+            ProtonEnergyLowerBound:   0.075
+            ProtonEnergyUpperBound:   1.0
         }
     }
     
