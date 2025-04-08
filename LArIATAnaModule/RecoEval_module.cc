@@ -267,6 +267,9 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> truthProtonsInitialPy;
         std::vector<double> truthProtonsInitialPz;
         std::vector<double> truthProtonsLength;
+        std::vector<double> truthProtonsEndX;
+        std::vector<double> truthProtonsEndY;
+        std::vector<double> truthProtonsEndZ;
 
         // WC variables
         int WC2TPCtrkID;
@@ -306,6 +309,9 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> matchedEndX;
         std::vector<double> matchedEndY;
         std::vector<double> matchedEndZ;
+        std::vector<double> matchedRealEndX;
+        std::vector<double> matchedRealEndY;
+        std::vector<double> matchedRealEndZ;
         std::vector<double> matchedLength;
 
         std::vector<double> matchedKEnergy;
@@ -509,7 +515,7 @@ void RecoEval::analyze(art::Event const &e) {
 
     // If for some reason we did not find the pion, flag and return
     if (primaryPion == NULL) {
-        std::cout << "WARNING: primary pion not found, aborting event" << std::endl;
+        std::cout << "Primary pion not found, aborting event" << std::endl;
         return;
     }
 
@@ -550,8 +556,7 @@ void RecoEval::analyze(art::Event const &e) {
     fillPionTruthData(primaryPion);
     fillProtonDaughtersTruthData(daughterProtons);
 
-    // Ignore pions not in TPC, should not be needed since in our pion 
-    // Redundant since we check containment in fiducial volume in signal
+    // Redundant since we check containment in reduced volume in signal
     // definition, but good sanity check anyways
     unsigned int trackBeginIndex = firstPointInTPC(primaryPion);
     unsigned int trackEndIndex   = lastPointInTPC(primaryPion);
@@ -688,8 +693,7 @@ void RecoEval::analyze(art::Event const &e) {
             if (
                 (thisTrack->ID() == WC2TPCtrkID) &&
                 (pdg_code == -211) &&
-                (process == "primary") &&
-                particleSpeciesIndex == 0
+                (process == "primary")            
             ) {
                 isPrimaryPionReco = true;
                 // Set index of primary pion to current size of vector before 
@@ -713,6 +717,9 @@ void RecoEval::analyze(art::Event const &e) {
             matchedEndX.push_back(particle->Vx(partTrackEnd));
             matchedEndY.push_back(particle->Vy(partTrackEnd));
             matchedEndZ.push_back(particle->Vz(partTrackEnd));
+            matchedRealEndX.push_back(particle->Vx(particle->NumberTrajectoryPoints()));
+            matchedRealEndY.push_back(particle->Vy(particle->NumberTrajectoryPoints()));
+            matchedRealEndZ.push_back(particle->Vz(particle->NumberTrajectoryPoints()));
             matchedLength.push_back(trackMagnitude(particle, partTrackBegin, partTrackEnd));
 
             // If particle ends in TPC, best end is two indices before actual last point
@@ -874,6 +881,9 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("truthProtonsInitialPy", "std::vector<double>", &truthProtonsInitialPy);
     RecoEvalTree->Branch("truthProtonsInitialPz", "std::vector<double>", &truthProtonsInitialPz);
     RecoEvalTree->Branch("truthProtonsLength", "std::vector<double>", &truthProtonsLength);
+    RecoEvalTree->Branch("truthProtonsEndX", "std::vector<double>", &truthProtonsEndX);
+    RecoEvalTree->Branch("truthProtonsEndY", "std::vector<double>", &truthProtonsEndY);
+    RecoEvalTree->Branch("truthProtonsEndZ", "std::vector<double>", &truthProtonsEndZ);
 
     RecoEvalTree->Branch("truthPionVertexPx", &truthPionVertexPx, "truthPionVertexPx/D");
     RecoEvalTree->Branch("truthPionVertexPy", &truthPionVertexPy, "truthPionVertexPy/D");
@@ -922,6 +932,9 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("matchedEndX", "std::vector<double>", &matchedEndX);
     RecoEvalTree->Branch("matchedEndY", "std::vector<double>", &matchedEndY);
     RecoEvalTree->Branch("matchedEndZ", "std::vector<double>", &matchedEndZ);
+    RecoEvalTree->Branch("matchedRealEndX", "std::vector<double>", &matchedRealEndX);
+    RecoEvalTree->Branch("matchedRealEndY", "std::vector<double>", &matchedRealEndY);
+    RecoEvalTree->Branch("matchedRealEndZ", "std::vector<double>", &matchedRealEndZ);
     RecoEvalTree->Branch("matchedLength", "std::vector<double>", &matchedLength);
 
     RecoEvalTree->Branch("matchedKEnergy", "std::vector<double>", &matchedKEnergy);
@@ -980,6 +993,10 @@ void RecoEval::fillProtonDaughtersTruthData(std::vector<simb::MCParticle*> daugh
         truthProtonsInitialPy.push_back(proton->Px(protonTrackBegin));
         truthProtonsInitialPz.push_back(proton->Px(protonTrackBegin));
         truthProtonsLength.push_back(trackMagnitude(proton, protonTrackBegin, protonTrackEnd));
+
+        truthProtonsEndX.push_back(proton->Vx(proton->NumberTrajectoryPoints()));
+        truthProtonsEndY.push_back(proton->Vy(proton->NumberTrajectoryPoints()));
+        truthProtonsEndZ.push_back(proton->Vz(proton->NumberTrajectoryPoints()));
 
         if (bVerbose) std::cout << "Filled information for proton with id: " << proton->TrackId() << std::endl;
     }
@@ -1105,6 +1122,9 @@ void RecoEval::resetTree() {
     truthProtonsInitialPy.clear();
     truthProtonsInitialPz.clear();
     truthProtonsLength.clear();
+    truthProtonsEndX.clear();
+    truthProtonsEndY.clear();
+    truthProtonsEndZ.clear();
 
     isTrackInverted.clear();
     recoBeginX.clear();
@@ -1127,6 +1147,9 @@ void RecoEval::resetTree() {
     matchedEndX.clear();
     matchedEndY.clear();
     matchedEndZ.clear();
+    matchedRealEndX.clear();
+    matchedRealEndY.clear();
+    matchedRealEndZ.clear();
     matchedLength.clear();
 
     matchedKEnergy.clear();

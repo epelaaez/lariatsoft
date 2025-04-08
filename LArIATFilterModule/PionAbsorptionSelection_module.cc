@@ -217,6 +217,7 @@ class PionAbsorptionSelection : public art::EDFilter {
         double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
         void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillBackgroundInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
 
     private:
         // Produce's names
@@ -241,28 +242,46 @@ class PionAbsorptionSelection : public art::EDFilter {
         TH1D* hTotalEvents;
         TH1D* hTotalEvents0pSignal;
         TH1D* hTotalEventsNpSignal;
+        TH1D* hTotalBackground;
+
         TH1D* hWCExists;
         TH1D* hWCExists0pSignal;
         TH1D* hWCExistsNpSignal;
+        TH1D* hWCExistsBackground;
+
         TH1D* hPionInRedVolume;
         TH1D* hPionInRedVolume0pSignal;
         TH1D* hPionInRedVolumeNpSignal;
+        TH1D* hPionInRedVolumeBackground;
 
         // For this, filling with 0.5 indicates 0p reco event
         // and filling with 1.5 indicates Np reco event
+        // For the background histos, 0pBackground contains
+        // the events that are reco'ed as 0p but are not at
+        // truth-level
         TH1D* hNoOutgoingPion;
         TH1D* hNoOutgoingPion0pSignal;
         TH1D* hNoOutgoingPionNpSignal;
+        TH1D* hNoOutgoingPion0pBackground;
+        TH1D* hNoOutgoingPionNpBackground;
+
         TH1D* hSmallTracks;
         TH1D* hSmallTracks0pSignal;
         TH1D* hSmallTracksNpSignal;
+        TH1D* hSmallTracks0pBackground;
+        TH1D* hSmallTracksNpBackground;
+
         TH1D* hMeanCurvature;
         TH1D* hMeanCurvature0pSignal;
         TH1D* hMeanCurvatureNpSignal;
+        TH1D* hMeanCurvature0pBackground;
+        TH1D* hMeanCurvatureNpBackground;
 
         TH1D* hFinalRecoEvents;
         TH1D* hFinalRecoEvents0pSignal;
         TH1D* hFinalRecoEventsNpSignal;
+        TH1D* hFinalRecoEvents0pBackground;
+        TH1D* hFinalRecoEventsNpBackground;
 
         // Cut variables
         double fMeanDEDXThreshold;
@@ -313,6 +332,22 @@ class PionAbsorptionSelection : public art::EDFilter {
         // Signal information
         bool isPionAbsorptionSignal;
         int  numVisibleProtons;
+
+        // Background information
+        int backgroundType; 
+        int NUM_BACKGROUND_TYPES = 10;
+        // Background types:
+        //    0:  0p pion absorption
+        //    1:  Np pion absorption
+        //    2:  primary muon event
+        //    3:  primary electron event
+        //    4:  other primary event
+        //    5:  primary pion outside reduced volume
+        //    6:  pion inelastic scattering
+        //    7:  charge exchange
+        //    8:  double charge exchange
+        //    9:  capture at rest
+        //    10: other
 
         // Proton tracks
         int                      protonCount = 0;
@@ -423,6 +458,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         if (numVisibleProtons == 0) hTotalEvents0pSignal->Fill(0.5);
         if (numVisibleProtons > 0)  hTotalEventsNpSignal->Fill(0.5);
     }
+    hTotalBackground->Fill(backgroundType);
 
     // First, we get all the reco data products we are going to need to make cuts
 
@@ -524,6 +560,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
             if (numVisibleProtons == 0) hWCExists0pSignal->Fill(0.5);
             if (numVisibleProtons > 0)  hWCExistsNpSignal->Fill(0.5);
         }
+        hWCExistsBackground->Fill(backgroundType);
 
         // Identify pion among reco tracks
         for (size_t trk_idx = 0; trk_idx < tpcTrackHandle -> size(); ++trk_idx) {
@@ -602,6 +639,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         if (numVisibleProtons == 0) hPionInRedVolume0pSignal->Fill(0.5);
         if (numVisibleProtons > 0)  hPionInRedVolumeNpSignal->Fill(0.5);
     }
+    hPionInRedVolumeBackground->Fill(backgroundType);
 
     // Count small tracks for shower cut
     int numSmallTracks = 0;
@@ -689,9 +727,12 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (protonCount > 0)  hNoOutgoingPion->Fill(1.5);
     if (isPionAbsorptionSignal) {
         if ((numVisibleProtons == 0) && (protonCount == 0)) hNoOutgoingPion0pSignal->Fill(0.5);
-        if ((numVisibleProtons == 0) && (protonCount > 0))  hNoOutgoingPion0pSignal->Fill(1.5);
-        if ((numVisibleProtons > 0) && (protonCount == 0))  hNoOutgoingPionNpSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  { hNoOutgoingPion0pSignal->Fill(1.5); hNoOutgoingPionNpBackground->Fill(0); }
+        if ((numVisibleProtons > 0) && (protonCount == 0))  { hNoOutgoingPionNpSignal->Fill(0.5); hNoOutgoingPion0pBackground->Fill(1); }
         if ((numVisibleProtons > 0) && (protonCount > 0))   hNoOutgoingPionNpSignal->Fill(1.5);
+    } else {
+        if (protonCount == 0)     hNoOutgoingPion0pBackground->Fill(backgroundType);
+        else if (protonCount > 0) hNoOutgoingPionNpBackground->Fill(backgroundType);
     }
 
     // Shower cut
@@ -702,9 +743,12 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (protonCount > 0)  hSmallTracks->Fill(1.5);
     if (isPionAbsorptionSignal) {
         if ((numVisibleProtons == 0) && (protonCount == 0)) hSmallTracks0pSignal->Fill(0.5);
-        if ((numVisibleProtons == 0) && (protonCount > 0))  hSmallTracks0pSignal->Fill(1.5);
-        if ((numVisibleProtons > 0) && (protonCount == 0))  hSmallTracksNpSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  { hSmallTracks0pSignal->Fill(1.5); hSmallTracksNpBackground->Fill(0); }
+        if ((numVisibleProtons > 0) && (protonCount == 0))  { hSmallTracksNpSignal->Fill(0.5); hSmallTracks0pBackground->Fill(1); }
         if ((numVisibleProtons > 0) && (protonCount > 0))   hSmallTracksNpSignal->Fill(1.5);
+    } else {
+        if (protonCount == 0)     hSmallTracks0pBackground->Fill(backgroundType);
+        else if (protonCount > 0) hSmallTracksNpBackground->Fill(backgroundType);
     }
 
     // Curvature cut
@@ -715,9 +759,12 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (protonCount > 0)  hMeanCurvature->Fill(1.5);
     if (isPionAbsorptionSignal) {
         if ((numVisibleProtons == 0) && (protonCount == 0)) hMeanCurvature0pSignal->Fill(0.5);
-        if ((numVisibleProtons == 0) && (protonCount > 0))  hMeanCurvature0pSignal->Fill(1.5);
-        if ((numVisibleProtons > 0) && (protonCount == 0))  hMeanCurvatureNpSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  { hMeanCurvature0pSignal->Fill(1.5); hMeanCurvatureNpBackground->Fill(0); }
+        if ((numVisibleProtons > 0) && (protonCount == 0))  { hMeanCurvatureNpSignal->Fill(0.5); hMeanCurvature0pBackground->Fill(1); }
         if ((numVisibleProtons > 0) && (protonCount > 0))   hMeanCurvatureNpSignal->Fill(1.5);
+    } else {
+        if (protonCount == 0)     hMeanCurvature0pBackground->Fill(backgroundType);
+        else if (protonCount > 0) hMeanCurvatureNpBackground->Fill(backgroundType);
     }
 
     // If we got to here, we passed all selection criteria
@@ -731,9 +778,12 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (protonCount > 0)  hFinalRecoEvents->Fill(1.5);
     if (isPionAbsorptionSignal) {
         if ((numVisibleProtons == 0) && (protonCount == 0)) hFinalRecoEvents0pSignal->Fill(0.5);
-        if ((numVisibleProtons == 0) && (protonCount > 0))  hFinalRecoEvents0pSignal->Fill(1.5);
-        if ((numVisibleProtons > 0) && (protonCount == 0))  hFinalRecoEventsNpSignal->Fill(0.5);
+        if ((numVisibleProtons == 0) && (protonCount > 0))  { hFinalRecoEvents0pSignal->Fill(1.5); hFinalRecoEventsNpBackground->Fill(0); }
+        if ((numVisibleProtons > 0) && (protonCount == 0))  { hFinalRecoEventsNpSignal->Fill(0.5); hFinalRecoEvents0pBackground->Fill(0); }
         if ((numVisibleProtons > 0) && (protonCount > 0))   hFinalRecoEventsNpSignal->Fill(1.5);
+    } else {
+        if (protonCount == 0)     hFinalRecoEvents0pBackground->Fill(backgroundType);
+        else if (protonCount > 0) hFinalRecoEventsNpBackground->Fill(backgroundType);
     }
 
     return true;
@@ -763,27 +813,44 @@ void PionAbsorptionSelection::beginJob() {
     art::ServiceHandle<art::TFileService> tfs;
 
     // Make histograms and tree branches
-    hTotalEvents             = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", 1, 0, 1);
-    hTotalEvents0pSignal     = tfs->make<TH1D>("hTotalEvents0pSignal", "hTotalEvents0pSignal", 1, 0, 1);
-    hTotalEventsNpSignal     = tfs->make<TH1D>("hTotalEventsNpSignal", "hTotalEventsNpSignal", 1, 0, 1);
-    hWCExists                = tfs->make<TH1D>("hWCExists", "hWCExists", 1, 0, 1);
-    hWCExists0pSignal        = tfs->make<TH1D>("hWCExists0pSignal", "hWCExists0pSignal", 1, 0, 1);
-    hWCExistsNpSignal        = tfs->make<TH1D>("hWCExistsNpSignal", "hWCExistsNpSignal", 1, 0, 1);
-    hPionInRedVolume         = tfs->make<TH1D>("hPionInRedVolume", "hPionInRedVolume", 1, 0, 1);
-    hPionInRedVolume0pSignal = tfs->make<TH1D>("hPionInRedVolume0pSignal", "hPionInRedVolume0pSignal", 1, 0, 1);
-    hPionInRedVolumeNpSignal = tfs->make<TH1D>("hPionInRedVolumeNpSignal", "hPionInRedVolumeNpSignal", 1, 0, 1);
-    hNoOutgoingPion          = tfs->make<TH1D>("hNoOutgoingPion", "hNoOutgoingPion", 2, 0, 2);
-    hNoOutgoingPion0pSignal  = tfs->make<TH1D>("hNoOutgoingPion0pSignal", "hNoOutgoingPion0pSignal", 2, 0, 2);
-    hNoOutgoingPionNpSignal  = tfs->make<TH1D>("hNoOutgoingPionNpSignal", "hNoOutgoingPionNpSignal", 2, 0, 2);
+    hTotalEvents         = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", 1, 0, 1);
+    hTotalEvents0pSignal = tfs->make<TH1D>("hTotalEvents0pSignal", "hTotalEvents0pSignal", 1, 0, 1);
+    hTotalEventsNpSignal = tfs->make<TH1D>("hTotalEventsNpSignal", "hTotalEventsNpSignal", 1, 0, 1);
+    hTotalBackground     = tfs->make<TH1D>("hTotalBackground", "hTotalBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
+    hWCExists           = tfs->make<TH1D>("hWCExists", "hWCExists", 1, 0, 1);
+    hWCExists0pSignal   = tfs->make<TH1D>("hWCExists0pSignal", "hWCExists0pSignal", 1, 0, 1);
+    hWCExistsNpSignal   = tfs->make<TH1D>("hWCExistsNpSignal", "hWCExistsNpSignal", 1, 0, 1);
+    hWCExistsBackground = tfs->make<TH1D>("hWCExistsBackground", "hWCExistsBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
+    hPionInRedVolume           = tfs->make<TH1D>("hPionInRedVolume", "hPionInRedVolume", 1, 0, 1);
+    hPionInRedVolume0pSignal   = tfs->make<TH1D>("hPionInRedVolume0pSignal", "hPionInRedVolume0pSignal", 1, 0, 1);
+    hPionInRedVolumeNpSignal   = tfs->make<TH1D>("hPionInRedVolumeNpSignal", "hPionInRedVolumeNpSignal", 1, 0, 1);
+    hPionInRedVolumeBackground = tfs->make<TH1D>("hPionInRedVolumeBackground", "hPionInRedVolumeBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
+    hNoOutgoingPion             = tfs->make<TH1D>("hNoOutgoingPion", "hNoOutgoingPion", 2, 0, 2);
+    hNoOutgoingPion0pSignal     = tfs->make<TH1D>("hNoOutgoingPion0pSignal", "hNoOutgoingPion0pSignal", 2, 0, 2);
+    hNoOutgoingPionNpSignal     = tfs->make<TH1D>("hNoOutgoingPionNpSignal", "hNoOutgoingPionNpSignal", 2, 0, 2);
+    hNoOutgoingPion0pBackground = tfs->make<TH1D>("hNoOutgoingPion0pBackground", "hNoOutgoingPion0pBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+    hNoOutgoingPionNpBackground = tfs->make<TH1D>("hNoOutgoingPionNpBackground", "hNoOutgoingPionNpBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
     hSmallTracks             = tfs->make<TH1D>("hSmallTracks", "hSmallTracks", 2, 0, 2);
     hSmallTracks0pSignal     = tfs->make<TH1D>("hSmallTracks0pSignal", "hSmallTracks0pSignal", 2, 0, 2); 
-    hSmallTracksNpSignal     = tfs->make<TH1D>("hSmallTracksNpSignal", "hSmallTracksNpSignal", 2, 0, 2); 
-    hMeanCurvature           = tfs->make<TH1D>("hMeanCurvature", "hMeanCurvature", 2, 0, 2);
-    hMeanCurvature0pSignal   = tfs->make<TH1D>("hMeanCurvature0pSignal", "hMeanCurvature0pSignal", 2, 0, 2);
-    hMeanCurvatureNpSignal   = tfs->make<TH1D>("hMeanCurvatureNpSignal", "hMeanCurvatureNpSignal", 2, 0, 2);
-    hFinalRecoEvents         = tfs->make<TH1D>("hFinalRecoEvents", "hFinalRecoEvents", 2, 0, 2);
-    hFinalRecoEvents0pSignal = tfs->make<TH1D>("hFinalRecoEvents0pSignal", "hFinalRecoEvents0pSignal", 2, 0, 2);
-    hFinalRecoEventsNpSignal = tfs->make<TH1D>("hFinalRecoEventsNpSignal", "hFinalRecoEventsNpSignal", 2, 0, 2);
+    hSmallTracksNpSignal     = tfs->make<TH1D>("hSmallTracksNpSignal", "hSmallTracksNpSignal", 2, 0, 2);
+    hSmallTracks0pBackground = tfs->make<TH1D>("hSmallTracks0pBackground", "hSmallTracks0pBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+    hSmallTracksNpBackground = tfs->make<TH1D>("hSmallTracksNpBackground", "hSmallTracksNpBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
+    hMeanCurvature             = tfs->make<TH1D>("hMeanCurvature", "hMeanCurvature", 2, 0, 2);
+    hMeanCurvature0pSignal     = tfs->make<TH1D>("hMeanCurvature0pSignal", "hMeanCurvature0pSignal", 2, 0, 2);
+    hMeanCurvatureNpSignal     = tfs->make<TH1D>("hMeanCurvatureNpSignal", "hMeanCurvatureNpSignal", 2, 0, 2);
+    hMeanCurvature0pBackground = tfs->make<TH1D>("hMeanCurvature0pBackground", "hMeanCurvature0pBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+    hMeanCurvatureNpBackground = tfs->make<TH1D>("hMeanCurvatureNpBackground", "hMeanCurvatureNpBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
+    hFinalRecoEvents             = tfs->make<TH1D>("hFinalRecoEvents", "hFinalRecoEvents", 2, 0, 2);
+    hFinalRecoEvents0pSignal     = tfs->make<TH1D>("hFinalRecoEvents0pSignal", "hFinalRecoEvents0pSignal", 2, 0, 2);
+    hFinalRecoEventsNpSignal     = tfs->make<TH1D>("hFinalRecoEventsNpSignal", "hFinalRecoEventsNpSignal", 2, 0, 2);
+    hFinalRecoEvents0pBackground = tfs->make<TH1D>("hFinalRecoEvents0pBackground", "hFinalRecoEvents0pBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+    hFinalRecoEventsNpBackground = tfs->make<TH1D>("hFinalRecoEventsNpBackground", "hFinalRecoEventsNpBackground", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
 
     PionAbsTree = tfs->make<TTree>("PionAbsorptionSelectionTree", "PionAbsorptionSelectionTree");
 
@@ -940,7 +1007,8 @@ void PionAbsorptionSelection::resetTree() {
     protonTrueProcess.clear();
 
     isPionAbsorptionSignal = false;
-    numVisibleProtons = 0;
+    numVisibleProtons      = 0;
+    backgroundType         = -1;
 }
 
 void PionAbsorptionSelection::fillSignalInformation(
@@ -950,19 +1018,21 @@ void PionAbsorptionSelection::fillSignalInformation(
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
 ) {
-    if (pdg != -211) return;
-    if (!isWithinReducedVolume(vx, vy, vz)) return;
+    bool isPionAbsorptionSignalTemp = true;
+
+    if (pdg != -211) isPionAbsorptionSignalTemp = false;
+    if (!isWithinReducedVolume(vx, vy, vz)) isPionAbsorptionSignalTemp = false;
 
     int numDaughters = daughtersPDG.size();
     int tempNumProtons = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
         if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
-        if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) return;
-        if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) return;
+        if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) isPionAbsorptionSignalTemp = false;
+        if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) isPionAbsorptionSignalTemp = false;
 
         if (daughtersProcess[iDaughter] == "pi-Inelastic") {
-            if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { return; } // muon
-            else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { return; } // kaon
+            if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { isPionAbsorptionSignalTemp = false; } // muon
+            else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { isPionAbsorptionSignalTemp = false; } // kaon
             else if (daughtersPDG[iDaughter] == 2212) {
                 if ((daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND) && (daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND)) {
                     tempNumProtons++;
@@ -971,9 +1041,64 @@ void PionAbsorptionSelection::fillSignalInformation(
         }
     }
 
-    numVisibleProtons = tempNumProtons;
-    isPionAbsorptionSignal = true;
+    if (isPionAbsorptionSignalTemp) {
+        // Event is signal!
+        numVisibleProtons      = tempNumProtons;
+        isPionAbsorptionSignal = true;
+    } else {
+        // Event is background, classify it
+        fillBackgroundInformation(
+            pdg,
+            vx, vy, vz,
+            daughtersPDG,
+            daughtersProcess,
+            daughtersKE
+        );
+    }
+
     return;
+}
+
+void PionAbsorptionSelection::fillBackgroundInformation(
+    int pdg,
+    float vx, float vy, float vz,
+    std::vector<int> daughtersPDG, 
+    std::vector<std::string> daughtersProcess, 
+    std::vector<double> daughtersKE
+) {
+    if (pdg != -211) { 
+        if (pdg == 13) { backgroundType = 2; }
+        else if (pdg == 13) { backgroundType = 3; }
+        else { backgroundType = 4; }
+        return; 
+    } 
+    if (!isWithinReducedVolume(vx, vy, vz)) { backgroundType = 5; return; }
+
+    int numDaughters = daughtersPDG.size();
+    int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0;
+    for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
+        if (daughtersPDG[iDaughter] == -211) {
+            numNegativePions++; 
+        } else if (daughtersPDG[iDaughter] == 111) {
+            numNeutralPions++;
+        } else if (daughtersPDG[iDaughter] == 211) {
+            numPositivePions++;
+        } else if (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest") {
+            backgroundType = 9; return;
+        }
+    }
+
+    if ((numNegativePions + numNeutralPions + numPositivePions) > 0) {
+        if ((numNegativePions == 1) && (numNeutralPions == 0) && (numPositivePions == 0)) {
+            backgroundType = 6;
+        } else if ((numNegativePions == 0) && (numNeutralPions == 1) && (numPositivePions == 0)) {
+            backgroundType = 7;
+        } else if ((numNegativePions == 0) && (numNeutralPions == 0) && (numPositivePions == 1)) {
+            backgroundType = 8;
+        } else {
+            backgroundType = 10;
+        }
+    }
 }
 
 std::tuple<double, double> PionAbsorptionSelection::computeCurvature(recob::Track track) {
