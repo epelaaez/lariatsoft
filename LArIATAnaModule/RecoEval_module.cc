@@ -220,6 +220,7 @@ class RecoEval : public art::EDAnalyzer {
         double trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2);
         double trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2);
         bool isWithinActiveVolume(double x, double y, double z);
+        bool isInReducedVolume(simb::MCParticle *track);
 
     private: 
         // Produce's names
@@ -259,6 +260,10 @@ class RecoEval : public art::EDAnalyzer {
         double truthPionVertexPx;
         double truthPionVertexPy;
         double truthPionVertexPz;
+
+        double truthPionEndX;
+        double truthPionEndY;
+        double truthPionEndZ;
 
         std::vector<double> truthProtonsEnergy;
         std::vector<double> truthProtonsKEnergy;
@@ -481,7 +486,10 @@ void RecoEval::analyze(art::Event const &e) {
 
         primaryPion = mcPart; // assign primary pion pointer
         pionTrackId = primaryPion->TrackId();
-        if (bVerbose) std::cout << "Found primary pion!" << std::endl;
+
+        // If primary pion not in reduced volume, return
+        if (!isInReducedVolume(primaryPion)) return;
+        if (bVerbose) std::cout << "Found primary pion in reduced volume!" << std::endl;
         if (bVerbose) std::cout << std::endl;
 
         // Get pion daughters
@@ -889,6 +897,10 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("truthPionVertexPy", &truthPionVertexPy, "truthPionVertexPy/D");
     RecoEvalTree->Branch("truthPionVertexPz", &truthPionVertexPz, "truthPionVertexPz/D");
 
+    RecoEvalTree->Branch("truthPionEndX", &truthPionEndX, "truthPionEndX/D");
+    RecoEvalTree->Branch("truthPionEndY", &truthPionEndY, "truthPionEndY/D");
+    RecoEvalTree->Branch("truthPionEndZ", &truthPionEndZ, "truthPionEndZ/D");
+
     RecoEvalTree->Branch("pionTrackId", &pionTrackId, "pionTrackId/I");
     RecoEvalTree->Branch("numDaughterProtons", &numDaughterProtons, "numDaughterProtons/I");
     RecoEvalTree->Branch("numDaughterNeutrons", &numDaughterNeutrons, "numDaughterNeutrons/I");
@@ -975,6 +987,10 @@ void RecoEval::fillPionTruthData(simb::MCParticle *pion) {
     truthPionVertexPx = vertexMomentum.Px();
     truthPionVertexPy = vertexMomentum.Py();
     truthPionVertexPz = vertexMomentum.Pz();
+
+    truthPionEndX = pion->EndX();
+    truthPionEndY = pion->EndY();
+    truthPionEndZ = pion->EndZ();
 
     if (bVerbose) std::cout << "Pion initial momentum: " << truthPionInitialMomentum << ", pion vertex momentum: " << truthPionVertexMomentum << std::endl;
     if (bVerbose) std::cout << "Pion initial energy: " << truthPionInitialEnergy << ", pion vertex energy: " << truthPionVertexEnergy << std::endl;
@@ -1110,6 +1126,14 @@ bool RecoEval::isWithinActiveVolume(double x, double y, double z) {
     if (z > maxZ ) return false;
     return true;
 }
+
+bool RecoEval::isInReducedVolume(simb::MCParticle *track) {
+    return (
+      (track->EndX()>RminX) && (track->EndX()<RmaxX) && 
+      (track->EndY()>RminY) && (track->EndY()<RmaxY) && 
+      (track->EndZ()>RminZ) && (track->EndZ()<RmaxZ)
+    );
+  }
 
 void RecoEval::resetTree() {
     numDaughterProtons = 0;

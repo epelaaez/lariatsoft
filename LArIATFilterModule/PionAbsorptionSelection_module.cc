@@ -335,7 +335,7 @@ class PionAbsorptionSelection : public art::EDFilter {
 
         // Background information
         int backgroundType; 
-        int NUM_BACKGROUND_TYPES = 10;
+        int NUM_BACKGROUND_TYPES = 11;
         // Background types:
         //    0:  0p pion absorption
         //    1:  Np pion absorption
@@ -347,7 +347,8 @@ class PionAbsorptionSelection : public art::EDFilter {
         //    7:  charge exchange
         //    8:  double charge exchange
         //    9:  capture at rest
-        //    10: other
+        //    10: decay
+        //    11: other
 
         // Proton tracks
         int                      protonCount = 0;
@@ -779,7 +780,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
     if (isPionAbsorptionSignal) {
         if ((numVisibleProtons == 0) && (protonCount == 0)) hFinalRecoEvents0pSignal->Fill(0.5);
         if ((numVisibleProtons == 0) && (protonCount > 0))  { hFinalRecoEvents0pSignal->Fill(1.5); hFinalRecoEventsNpBackground->Fill(0); }
-        if ((numVisibleProtons > 0) && (protonCount == 0))  { hFinalRecoEventsNpSignal->Fill(0.5); hFinalRecoEvents0pBackground->Fill(0); }
+        if ((numVisibleProtons > 0) && (protonCount == 0))  { hFinalRecoEventsNpSignal->Fill(0.5); hFinalRecoEvents0pBackground->Fill(1); }
         if ((numVisibleProtons > 0) && (protonCount > 0))   hFinalRecoEventsNpSignal->Fill(1.5);
     } else {
         if (protonCount == 0)     hFinalRecoEvents0pBackground->Fill(backgroundType);
@@ -874,6 +875,7 @@ void PionAbsorptionSelection::beginJob() {
 
     PionAbsTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
     PionAbsTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
+    PionAbsTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
 
     PionAbsTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
     PionAbsTree->Branch("WC2TPCPionBeginX", &WC2TPCPionBeginX, "WC2TPCPionBeginX/D");
@@ -1066,13 +1068,12 @@ void PionAbsorptionSelection::fillBackgroundInformation(
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
 ) {
-    if (pdg != -211) { 
+    if (pdg != -211) {
         if (pdg == 13) { backgroundType = 2; }
-        else if (pdg == 13) { backgroundType = 3; }
+        else if (pdg == 11) { backgroundType = 3; }
         else { backgroundType = 4; }
         return; 
     } 
-    if (!isWithinReducedVolume(vx, vy, vz)) { backgroundType = 5; return; }
 
     int numDaughters = daughtersPDG.size();
     int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0;
@@ -1085,6 +1086,8 @@ void PionAbsorptionSelection::fillBackgroundInformation(
             numPositivePions++;
         } else if (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest") {
             backgroundType = 9; return;
+        } else if (daughtersProcess[iDaughter] == "Decay") {
+            backgroundType = 10; return;
         }
     }
 
@@ -1095,10 +1098,14 @@ void PionAbsorptionSelection::fillBackgroundInformation(
             backgroundType = 7;
         } else if ((numNegativePions == 0) && (numNeutralPions == 0) && (numPositivePions == 1)) {
             backgroundType = 8;
-        } else {
-            backgroundType = 10;
         }
     }
+
+    // Only flag as outside reduced volume if it is not anything else
+    if ((backgroundType == -1) && (!isWithinReducedVolume(vx, vy, vz))) { backgroundType = 5; return; }
+
+    // If not flagged at this point, label as other
+    if (backgroundType == -1) backgroundType = 11;
 }
 
 std::tuple<double, double> PionAbsorptionSelection::computeCurvature(recob::Track track) {
