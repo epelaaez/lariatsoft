@@ -212,15 +212,17 @@ class RecoEval : public art::EDAnalyzer {
         unsigned int firstPointInTPC(simb::MCParticle *track);
         unsigned int firstPointInTPC(const art::Ptr<simb::MCParticle> track);
 
-        void fillPionTruthData(simb::MCParticle *pion);
-        void fillProtonDaughtersTruthData(std::vector<simb::MCParticle*> daughterProtons);
-
         bool isPosterityOfPrimary(simb::MCParticle *particle, const sim::ParticleList& plist);
         double trackMagnitude(simb::MCParticle *track);
         double trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2);
         double trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2);
         bool isWithinActiveVolume(double x, double y, double z);
-        bool isInReducedVolume(simb::MCParticle *track);
+        bool isWithinReducedVolume(double x, double y, double z);
+        bool isWithinReducedVolume(simb::MCParticle *track);
+
+        // Get data about event signature
+        void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillBackgroundInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
 
     private: 
         // Produce's names
@@ -232,9 +234,11 @@ class RecoEval : public art::EDAnalyzer {
         std::string recotrackmcparticlematching_label_;
 
         // fcl parameters
-        bool bVerbose;
+        bool         bVerbose;
         unsigned int MeanDEDXNumberTrajPoints;
-        double TrackStitchingThreshold;
+        double       TrackStitchingThreshold;
+        float        PROTON_ENERGY_LOWER_BOUND;
+        float        PROTON_ENERGY_UPPER_BOUND;
 
         // Output tree
         TTree *RecoEvalTree;
@@ -244,62 +248,60 @@ class RecoEval : public art::EDAnalyzer {
         int subrun;
         int event;
 
-        int pionTrackId;
-        int numDaughterProtons = 0;
-        int numDaughterNeutrons = 0;
+        // Signal information
+        bool isPionAbsorptionSignal;
+        int  numVisibleProtons;
 
-        // Truth-level data
-        double truthPionInitialEnergy;
-        double truthPionInitialKEnergy;
-        double truthPionInitialMomentum;
+        // Background information
+        int backgroundType; 
+        int NUM_BACKGROUND_TYPES = 11;
+        // Background types:
+        //    0:  0p pion absorption
+        //    1:  Np pion absorption
+        //    2:  primary muon event
+        //    3:  primary electron event
+        //    4:  other primary event
+        //    5:  primary pion outside reduced volume
+        //    6:  pion inelastic scattering
+        //    7:  charge exchange
+        //    8:  double charge exchange
+        //    9:  capture at rest
+        //    10: decay
+        //    11: other
 
-        double truthPionVertexEnergy;
-        double truthPionVertexKEnergy;
-        double truthPionVertexMomentum;
-
-        double truthPionVertexPx;
-        double truthPionVertexPy;
-        double truthPionVertexPz;
-
-        double truthPionEndX;
-        double truthPionEndY;
-        double truthPionEndZ;
-
-        std::vector<double> truthProtonsEnergy;
-        std::vector<double> truthProtonsKEnergy;
-        std::vector<double> truthProtonsInitialMomentum;
-        std::vector<double> truthProtonsInitialPx;
-        std::vector<double> truthProtonsInitialPy;
-        std::vector<double> truthProtonsInitialPz;
-        std::vector<double> truthProtonsLength;
-        std::vector<double> truthProtonsEndX;
-        std::vector<double> truthProtonsEndY;
-        std::vector<double> truthProtonsEndZ;
+        // Truth primary information
+        int                      truthPrimaryPDG;
+        float                    truthPrimaryVertexX;
+        float                    truthPrimaryVertexY;
+        float                    truthPrimaryVertexZ;
+        std::vector<int>         truthPrimaryDaughtersPDG;
+        std::vector<std::string> truthPrimaryDaughtersProcess;
+        std::vector<double>      truthPrimaryDaughtersKE;
 
         // WC variables
         int WC2TPCtrkID;
         double WCTrackMomentum;
-        double WC2TPCPionBeginX;
-        double WC2TPCPionBeginY;
-        double WC2TPCPionBeginZ;
-        double WC3PionX;
-        double WC3PionY;
-        double WC3PionZ;
-        double WC4PionX;
-        double WC4PionY;
-        double WC4PionZ;
+        double WC2TPCPrimaryBeginX;
+        double WC2TPCPrimaryBeginY;
+        double WC2TPCPrimaryBeginZ;
+        double WC3PrimaryX;
+        double WC3PrimaryY;
+        double WC3PrimaryZ;
+        double WC4PrimaryX;
+        double WC4PrimaryY;
+        double WC4PrimaryZ;
         double WCTheta;
         double WCPhi;
 
         // Reco variables
-        std::vector<bool> isTrackInverted;
+        std::vector<bool>   isTrackInverted;
         std::vector<double> recoBeginX;
         std::vector<double> recoBeginY;
         std::vector<double> recoBeginZ;
         std::vector<double> recoEndX;
         std::vector<double> recoEndY;
         std::vector<double> recoEndZ;
-        std::vector<int> recoTrkID;
+        std::vector<int>    recoTrkID;
 
         // Truth variables for particles matched to tracks
         std::vector<int>    matchedIdentity;
@@ -329,8 +331,6 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> matchedEndingPy;
         std::vector<double> matchedEndingPz;
         
-        std::vector<bool>   matchedIsPosterityProton;
-
         // Calorimetry variables for tracks
         std::vector<std::vector<double>> recoPitch;
         std::vector<std::vector<double>> recoDEDX;
@@ -338,11 +338,6 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<std::vector<double>> recoResR;
         std::vector<std::vector<double>> recoZPos;
         std::vector<double> recoMeanDEDX;
-
-        // Pion reconstruction
-        bool isPrimaryPionReco  = false;
-        bool hasBrokenPionTrack = false;
-        std::vector<double> distancePrimaryPionOtherPion;
 
         // Masses
         const double PionMass    = .13957018;    // in GeV
@@ -377,6 +372,58 @@ void RecoEval::analyze(art::Event const &e) {
     if (bVerbose) std::cout << "Run: " << run << ", subrun: " << subrun << ", event: " << event << std::endl;
     if (bVerbose) std::cout << std::endl;
 
+    //////////////
+    // Get MC data
+    //////////////
+
+    // Get simulated particles
+    auto particle_handle = e.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
+    std::vector<art::Ptr<simb::MCParticle>> particle_vector;
+    art::fill_ptr_vector(particle_vector, particle_handle);
+
+    // Get particle list
+    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    const sim::ParticleList& plist = pi_serv->ParticleList();
+
+    // Initialize particle map (typedef at top) and fill it
+    ParticleMap particle_map;
+    for (auto const& particle : particle_vector) {
+        particle_map[particle->TrackId()] = particle;
+    }
+
+    // Identify true-level primary pion and get its information
+    std::vector<int> primaryDaughtersIDs;
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (part->Process() == "primary") {
+            truthPrimaryPDG = part->PdgCode();
+            for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
+            truthPrimaryVertexX = part->EndX();
+            truthPrimaryVertexY = part->EndY();
+            truthPrimaryVertexZ = part->EndZ(); 
+            break;
+        }
+    }
+
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
+            truthPrimaryDaughtersProcess.push_back(part->Process());
+            truthPrimaryDaughtersPDG.push_back(part->PdgCode());
+            truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
+        }
+    }
+
+    fillSignalInformation(
+        truthPrimaryPDG, 
+        truthPrimaryVertexX,
+        truthPrimaryVertexY,
+        truthPrimaryVertexZ,
+        truthPrimaryDaughtersPDG,
+        truthPrimaryDaughtersProcess,
+        truthPrimaryDaughtersKE
+    );
+
     //////////////////////
     // Wire chamber tracks
     //////////////////////
@@ -394,14 +441,14 @@ void RecoEval::analyze(art::Event const &e) {
 
     // Get wcTrack momentum
     WCTrackMomentum = wctrack[0]->Momentum() * 0.001; // Mev to GeV
-    WC3PionX = wctrack[0]->HitPosition(2,0);
-    WC3PionY = wctrack[0]->HitPosition(2,1);
-    WC3PionZ = wctrack[0]->HitPosition(2,2);
-    WC4PionX = wctrack[0]->HitPosition(3,0);
-    WC4PionY = wctrack[0]->HitPosition(3,1);
-    WC4PionZ = wctrack[0]->HitPosition(3,2);
-    WCTheta  = wctrack[0]->Theta();
-    WCPhi    = wctrack[0]->Phi();
+    WC3PrimaryX = wctrack[0]->HitPosition(2,0);
+    WC3PrimaryY = wctrack[0]->HitPosition(2,1);
+    WC3PrimaryZ = wctrack[0]->HitPosition(2,2);
+    WC4PrimaryX = wctrack[0]->HitPosition(3,0);
+    WC4PrimaryY = wctrack[0]->HitPosition(3,1);
+    WC4PrimaryZ = wctrack[0]->HitPosition(3,2);
+    WCTheta     = wctrack[0]->Theta();
+    WCPhi       = wctrack[0]->Phi();
 
     if (bVerbose) std::cout << "WCTrackMomentum: " << WCTrackMomentum << std::endl;
     if (bVerbose) std::cout << std::endl;
@@ -442,17 +489,14 @@ void RecoEval::analyze(art::Event const &e) {
             if (bVerbose) std::cout << std::endl;
 
             auto recoWC2TPCBeginning = aTrack.Start();
-
             if ((aTrack.Start()).Z() < (aTrack.End()).Z()) {
                 recoWC2TPCBeginning = aTrack.Start();
             } else {
                 recoWC2TPCBeginning = aTrack.End();
             }
-
-            WC2TPCPionBeginX = recoWC2TPCBeginning.X();
-            WC2TPCPionBeginY = recoWC2TPCBeginning.Y();
-            WC2TPCPionBeginZ = recoWC2TPCBeginning.Z();
-
+            WC2TPCPrimaryBeginX = recoWC2TPCBeginning.X();
+            WC2TPCPrimaryBeginY = recoWC2TPCBeginning.Y();
+            WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();
         } // end trackWC2TPC loop
     } // end if fWC2TPC.isValid()
 
@@ -464,111 +508,6 @@ void RecoEval::analyze(art::Event const &e) {
     art::ServiceHandle<geo::Geometry> geom;
     // Get the backtracer to recover true quantities
     art::ServiceHandle<cheat::BackTrackerService> bt;
-    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-    const sim::ParticleList& plist = pi_serv->ParticleList();
-
-    // Pointer to assign pion to
-    simb::MCParticle *primaryPion = NULL;
-    std::vector<simb::MCParticle*> daughterProtons; 
-    std::vector<int>               daughterProtonsTrackIds;
-    std::vector<simb::MCParticle*> daughterNeutrons; 
-
-    // Loop over all Geant4 particles using the BackTracker
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto mcPart = plist.Particle(p);
-
-        // Get true particle
-        std::string particleProcess = mcPart->Process();
-        if (
-            !(particleProcess.find("primary") != std::string::npos) && // If particle is not primary
-            !(mcPart->PdgCode() == -211) // Check pdg code indicates negative pion
-        ) continue;
-
-        primaryPion = mcPart; // assign primary pion pointer
-        pionTrackId = primaryPion->TrackId();
-
-        // If primary pion not in reduced volume, return
-        if (!isInReducedVolume(primaryPion)) return;
-        if (bVerbose) std::cout << "Found primary pion in reduced volume!" << std::endl;
-        if (bVerbose) std::cout << std::endl;
-
-        // Get pion daughters
-        int numPionDaughters = primaryPion->NumberDaughters();
-        for (int iDaughter = 0; iDaughter < numPionDaughters; ++iDaughter) {
-            int thisDaughterTrackId = primaryPion->Daughter(iDaughter);
-            simb::MCParticle *thisDaughter = NULL;
-
-            // Grab daughter with thisDaughterTrackId
-            for (size_t q = 0; q < plist.size(); ++q) {
-                if (plist.Particle(q)->TrackId() == thisDaughterTrackId) {
-                    thisDaughter = plist.Particle(q);
-                    break;
-                }
-            }
-
-            if (thisDaughter->Process() == "pi-Inelastic") {
-                if (thisDaughter->PdgCode() == 2112) {
-                    numDaughterNeutrons++; 
-                    daughterNeutrons.push_back(thisDaughter);
-                }
-                if (thisDaughter->PdgCode() == 2212) {
-                    numDaughterProtons++; 
-                    daughterProtons.push_back(thisDaughter);
-                    daughterProtonsTrackIds.push_back(thisDaughter->TrackId());
-                }
-            }
-        } // end pion daughters loop
-        break; // Break once we find primary pion
-    } // end Geant4 particle loop
-
-    // If for some reason we did not find the pion, flag and return
-    if (primaryPion == NULL) {
-        std::cout << "Primary pion not found, aborting event" << std::endl;
-        return;
-    }
-
-    if (bVerbose) std::cout << "Number of protons before looking for posterity protons: " << daughterProtons.size() << std::endl;
-
-    // Get posterity protons
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto mcPart = plist.Particle(p);
-        int partTrackId = mcPart->TrackId();
-
-        // If track id is of proton we are already tracking or primary pion, continue
-        // Also continue if particle is not a proton
-        if (
-            (std::find(daughterProtonsTrackIds.begin(), daughterProtonsTrackIds.end(), partTrackId) != daughterProtonsTrackIds.end()) ||
-            (partTrackId == pionTrackId) ||
-            (mcPart->PdgCode() != 2212)
-        ) continue;
-
-        // Check if proton is in TPC
-        unsigned int protonTrackBegin = firstPointInTPC(mcPart);
-        unsigned int protonTrackEnd   = lastPointInTPC(mcPart);
-        if (protonTrackBegin == 9999 || protonTrackEnd == 9999) continue;
-
-        // Check if proton is in pion's family tree
-        if (isPosterityOfPrimary(mcPart, plist)) {
-            if (bVerbose) std::cout << "Found posterity proton with track id: " << partTrackId << std::endl;
-
-            // numDaughterProtons++; // Would this double count protons?
-            daughterProtons.push_back(mcPart);
-            daughterProtonsTrackIds.push_back(partTrackId);
-        }
-    }
-
-    if (bVerbose) std::cout << "Number of protons after looking for posterity protons: " << daughterProtons.size() << std::endl;
-    if (bVerbose) std::cout << std::endl;
-
-    // Get relevant pion truth information
-    fillPionTruthData(primaryPion);
-    fillProtonDaughtersTruthData(daughterProtons);
-
-    // Redundant since we check containment in reduced volume in signal
-    // definition, but good sanity check anyways
-    unsigned int trackBeginIndex = firstPointInTPC(primaryPion);
-    unsigned int trackEndIndex   = lastPointInTPC(primaryPion);
-    if (trackBeginIndex == 9999 || trackEndIndex == 9999) return;
 
     ////////////////////////////////////
     // Truth matching using Johnny's Alg
@@ -577,32 +516,21 @@ void RecoEval::analyze(art::Event const &e) {
     // Define calorimetry
     art::FindManyP<anab::Calorimetry> fmcal(tpcTrackHandle, e, strCalorimetryModuleLabel);
 
-    // Get simulated particles
-    auto particle_handle = e.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
-    std::vector<art::Ptr<simb::MCParticle>> particle_vector;
-    art::fill_ptr_vector(particle_vector, particle_handle);
-
-    // Initialize particle map (typedef at top) and fill it
-    ParticleMap particle_map;
-    for (auto const& particle : particle_vector) {
-        particle_map[particle->TrackId()] = particle;
-    }
-
     // Get MCParticles from tracks
     const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
         find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
 
     // Useful to order protons based on furthest-right pion track later on
-    double maxPionEndZ    = -9999;
-    double pionRecoEndX   = -9999;
-    double pionRecoEndY   = -9999;
-    double pionRecoEndZ   = -9999;
-    int primaryPionRecoTrackIndex = -9999;
+    double maxPrimaryEndZ    = -9999;
+    double primaryRecoEndX   = -9999;
+    double primaryRecoEndY   = -9999;
+    double primaryRecoEndZ   = -9999;
+    int primaryRecoTrackIndex = -9999;
 
     // Do track matching
     for (int particleSpeciesIndex = 0; particleSpeciesIndex <= 2; particleSpeciesIndex++) {
         // This first loop goes over the types of particle that we want to match in order of
-        // their priority: primary pion, protons, everything else
+        // their priority: primary, protons, everything else
 
         for (size_t trkIdx = 0; trkIdx < tpcTrackHandle->size(); ++trkIdx) {
             // Now, we loop over the TPC tracks
@@ -666,24 +594,24 @@ void RecoEval::analyze(art::Event const &e) {
                     isThisTrackReversed = true;
                 }
 
-                if (recoEnd.Z() > maxPionEndZ) {
-                    maxPionEndZ    = recoEnd.Z();
-                    pionRecoEndX   = recoEnd.X();
-                    pionRecoEndY   = recoEnd.Y();
-                    pionRecoEndZ   = recoEnd.Z();
+                if (recoEnd.Z() > maxPrimaryEndZ) {
+                    maxPrimaryEndZ  = recoEnd.Z();
+                    primaryRecoEndX = recoEnd.X();
+                    primaryRecoEndY = recoEnd.Y();
+                    primaryRecoEndZ = recoEnd.Z();
                 }
             } // end pion matching
 
             // Proton matching and ordering
             if (particleSpeciesIndex == 1) {
                 if (sqrt(
-                    pow((thisTrack->Start()).X() - pionRecoEndX, 2) + 
-                    pow((thisTrack->Start()).Y() - pionRecoEndY, 2) + 
-                    pow((thisTrack->Start()).Z() - pionRecoEndZ, 2)
+                    pow((thisTrack->Start()).X() - primaryRecoEndX, 2) + 
+                    pow((thisTrack->Start()).Y() - primaryRecoEndY, 2) + 
+                    pow((thisTrack->Start()).Z() - primaryRecoEndZ, 2)
                 ) < sqrt(
-                    pow((thisTrack->End()).X() - pionRecoEndX, 2) + 
-                    pow((thisTrack->End()).Y() - pionRecoEndY, 2) + 
-                    pow((thisTrack->End()).Z() - pionRecoEndZ, 2)
+                    pow((thisTrack->End()).X() - primaryRecoEndX, 2) + 
+                    pow((thisTrack->End()).Y() - primaryRecoEndY, 2) + 
+                    pow((thisTrack->End()).Z() - primaryRecoEndZ, 2)
                 )) {
                     isThisTrackReversed = false;
                     recoBeginning       = thisTrack->Start();
@@ -696,18 +624,6 @@ void RecoEval::analyze(art::Event const &e) {
             } // end proton matching
 
             isTrackInverted.push_back(isThisTrackReversed);
-
-            // Check if track is primary pion
-            if (
-                (thisTrack->ID() == WC2TPCtrkID) &&
-                (pdg_code == -211) &&
-                (process == "primary")            
-            ) {
-                isPrimaryPionReco = true;
-                // Set index of primary pion to current size of vector before 
-                // adding it to the vector
-                primaryPionRecoTrackIndex = (int) recoBeginX.size();
-            }
 
             // Fill in data to vectors for tree
             recoBeginX.push_back(recoBeginning.X());
@@ -756,11 +672,6 @@ void RecoEval::analyze(art::Event const &e) {
             matchedCleanliness.push_back(cleanliness);
             matchedTrkID.push_back(g4_trk_id);
             matchedProcess.push_back(process);
-
-            // Tag track if it matches to posterity proton
-            bool isThisPosterityProton = false;
-            if(std::find(daughterProtonsTrackIds.begin(), daughterProtonsTrackIds.end(), g4_trk_id) != daughterProtonsTrackIds.end()) isThisPosterityProton = true;
-            matchedIsPosterityProton.push_back(isThisPosterityProton);
 
             ////////////////////////
             // Calorimetry 
@@ -838,25 +749,6 @@ void RecoEval::analyze(art::Event const &e) {
         } // end loop over tracks
     } // end loop over particle species
 
-    // Test for broken pion tracks
-    if (isPrimaryPionReco) {
-        for (unsigned int i = 0; i < recoBeginX.size(); ++i) {
-            // Check if there is other pion that is not primary
-            if (((int) i != primaryPionRecoTrackIndex) && (matchedIdentity.at(i) == -211)) {
-                double pionDistance = sqrt(
-                    pow(recoBeginX.at(i) - recoEndX.at(primaryPionRecoTrackIndex), 2) + 
-                    pow(recoBeginY.at(i) - recoEndY.at(primaryPionRecoTrackIndex), 2) + 
-                    pow(recoBeginZ.at(i) - recoEndZ.at(primaryPionRecoTrackIndex), 2)
-                );
-                distancePrimaryPionOtherPion.push_back(pionDistance);
-                if (pionDistance < TrackStitchingThreshold) {
-                    if (bVerbose) std::cout << "Pion track broken" << std::endl;
-                    hasBrokenPionTrack = true;
-                }
-            } // if we find pion that is not primary
-        } // loop over reco tracks
-    }
-
     if (bVerbose) std::cout << std::endl;
     RecoEvalTree->Fill();
 }
@@ -873,52 +765,29 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("subrun", &subrun, "subrun/I");
     RecoEvalTree->Branch("event", &event, "event/I");
 
-    RecoEvalTree->Branch("truthPionInitialEnergy", &truthPionInitialEnergy, "truthPionInitialEnergy/D");
-    RecoEvalTree->Branch("truthPionInitialKEnergy", &truthPionInitialKEnergy, "truthPionInitialKEnergy/D");
-    RecoEvalTree->Branch("truthPionInitialMomentum", &truthPionInitialMomentum, "truthPionInitialMomentum/D");
+    RecoEvalTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
+    RecoEvalTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
+    RecoEvalTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
 
-    RecoEvalTree->Branch("truthPionVertexEnergy", &truthPionVertexEnergy, "truthPionVertexEnergy/D");
-    RecoEvalTree->Branch("truthPionVertexKEnergy", &truthPionVertexKEnergy, "truthPionVertexKEnergy/D");
-    RecoEvalTree->Branch("truthPionVertexMomentum", &truthPionVertexMomentum, "truthPionVertexMomentum/D");
-
-    RecoEvalTree->Branch("truthProtonsEnergy", "std::vector<double>", &truthProtonsEnergy);
-    RecoEvalTree->Branch("truthProtonsKEnergy", "std::vector<double>", &truthProtonsKEnergy);
-    RecoEvalTree->Branch("truthProtonsInitialMomentum", "std::vector<double>", &truthProtonsInitialMomentum);
-    RecoEvalTree->Branch("truthProtonsInitialPx", "std::vector<double>", &truthProtonsInitialPx);
-    RecoEvalTree->Branch("truthProtonsInitialPy", "std::vector<double>", &truthProtonsInitialPy);
-    RecoEvalTree->Branch("truthProtonsInitialPz", "std::vector<double>", &truthProtonsInitialPz);
-    RecoEvalTree->Branch("truthProtonsLength", "std::vector<double>", &truthProtonsLength);
-    RecoEvalTree->Branch("truthProtonsEndX", "std::vector<double>", &truthProtonsEndX);
-    RecoEvalTree->Branch("truthProtonsEndY", "std::vector<double>", &truthProtonsEndY);
-    RecoEvalTree->Branch("truthProtonsEndZ", "std::vector<double>", &truthProtonsEndZ);
-
-    RecoEvalTree->Branch("truthPionVertexPx", &truthPionVertexPx, "truthPionVertexPx/D");
-    RecoEvalTree->Branch("truthPionVertexPy", &truthPionVertexPy, "truthPionVertexPy/D");
-    RecoEvalTree->Branch("truthPionVertexPz", &truthPionVertexPz, "truthPionVertexPz/D");
-
-    RecoEvalTree->Branch("truthPionEndX", &truthPionEndX, "truthPionEndX/D");
-    RecoEvalTree->Branch("truthPionEndY", &truthPionEndY, "truthPionEndY/D");
-    RecoEvalTree->Branch("truthPionEndZ", &truthPionEndZ, "truthPionEndZ/D");
-
-    RecoEvalTree->Branch("pionTrackId", &pionTrackId, "pionTrackId/I");
-    RecoEvalTree->Branch("numDaughterProtons", &numDaughterProtons, "numDaughterProtons/I");
-    RecoEvalTree->Branch("numDaughterNeutrons", &numDaughterNeutrons, "numDaughterNeutrons/I");
-
-    RecoEvalTree->Branch("isPrimaryPionReco", &isPrimaryPionReco, "isPrimaryPionReco/B");
-    RecoEvalTree->Branch("hasBrokenPionTrack", &hasBrokenPionTrack, "hasBrokenPionTrack/B");
-    RecoEvalTree->Branch("distancePrimaryPionOtherPion", "std::vector<double>", &distancePrimaryPionOtherPion);
+    RecoEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
+    RecoEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/F");
+    RecoEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/F");
+    RecoEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/F");
+    RecoEvalTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
+    RecoEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
+    RecoEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
 
     RecoEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
     RecoEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
-    RecoEvalTree->Branch("WC2TPCPionBeginX", &WC2TPCPionBeginX, "WC2TPCPionBeginX/D");
-    RecoEvalTree->Branch("WC2TPCPionBeginY", &WC2TPCPionBeginY, "WC2TPCPionBeginY/D");
-    RecoEvalTree->Branch("WC2TPCPionBeginZ", &WC2TPCPionBeginZ, "WC2TPCPionBeginZ/D");
-    RecoEvalTree->Branch("WC3PionX", &WC3PionX, "WC3PionX/D");
-    RecoEvalTree->Branch("WC3PionY", &WC3PionY, "WC3PionY/D");
-    RecoEvalTree->Branch("WC3PionZ", &WC3PionZ, "WC3PionZ/D");
-    RecoEvalTree->Branch("WC4PionX", &WC4PionX, "WC4PionX/D");
-    RecoEvalTree->Branch("WC4PionY", &WC4PionY, "WC4PionY/D");
-    RecoEvalTree->Branch("WC4PionZ", &WC4PionZ, "WC4PionZ/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryBeginX", &WC2TPCPrimaryBeginX, "WC2TPCPrimaryBeginX/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryBeginY", &WC2TPCPrimaryBeginY, "WC2TPCPrimaryBeginY/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryBeginZ", &WC2TPCPrimaryBeginZ, "WC2TPCPrimaryBeginZ/D");
+    RecoEvalTree->Branch("WC3PrimaryX", &WC3PrimaryX, "WC3PrimaryX/D");
+    RecoEvalTree->Branch("WC3PrimaryY", &WC3PrimaryY, "WC3PrimaryY/D");
+    RecoEvalTree->Branch("WC3PrimaryZ", &WC3PrimaryZ, "WC3PrimaryZ/D");
+    RecoEvalTree->Branch("WC4PrimaryX", &WC4PrimaryX, "WC4PrimaryX/D");
+    RecoEvalTree->Branch("WC4PrimaryY", &WC4PrimaryY, "WC4PrimaryY/D");
+    RecoEvalTree->Branch("WC4PrimaryZ", &WC4PrimaryZ, "WC4PrimaryZ/D");
     RecoEvalTree->Branch("WCTheta", &WCTheta, "WCTheta/D");
     RecoEvalTree->Branch("WCPhi", &WCPhi, "WCPhi/D");
 
@@ -958,64 +827,12 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("matchedEndingPy", "std::vector<double>", &matchedEndingPy);
     RecoEvalTree->Branch("matchedEndingPz", "std::vector<double>", &matchedEndingPz);
 
-    RecoEvalTree->Branch("matchedIsPosterityProton", "std::vector<bool>", &matchedIsPosterityProton);
-
     RecoEvalTree->Branch("recoPitch","std::vector<std::vector<double>>",&recoPitch);
     RecoEvalTree->Branch("recoDEDX","std::vector<std::vector<double>>",&recoDEDX);
     RecoEvalTree->Branch("recoEDep","std::vector<std::vector<double>>",&recoEDep);
     RecoEvalTree->Branch("recoResR","std::vector<std::vector<double>>",&recoResR);
     RecoEvalTree->Branch("recoZPos","std::vector<std::vector<double>>",&recoZPos);
     RecoEvalTree->Branch("recoMeanDEDX","std::vector<double>",&recoMeanDEDX);
-}
-
-void RecoEval::fillPionTruthData(simb::MCParticle *pion) {
-    unsigned int pionTrackBegin = firstPointInTPC(pion);
-    int vertexIndex = pion->NumberTrajectoryPoints() - 2;
-
-    TLorentzVector initialMomentum = pion->Momentum(pionTrackBegin);
-    TLorentzVector vertexMomentum  = pion->Momentum(vertexIndex);
-
-    truthPionInitialEnergy   = initialMomentum.E();
-    truthPionInitialKEnergy  = initialMomentum.E() - PionMass;
-    truthPionInitialMomentum = initialMomentum.P();
-
-    truthPionVertexEnergy   = vertexMomentum.E();
-    truthPionVertexKEnergy  = vertexMomentum.E() - PionMass;
-    truthPionVertexMomentum = vertexMomentum.P();
-
-    truthPionVertexPx = vertexMomentum.Px();
-    truthPionVertexPy = vertexMomentum.Py();
-    truthPionVertexPz = vertexMomentum.Pz();
-
-    truthPionEndX = pion->EndX();
-    truthPionEndY = pion->EndY();
-    truthPionEndZ = pion->EndZ();
-
-    if (bVerbose) std::cout << "Pion initial momentum: " << truthPionInitialMomentum << ", pion vertex momentum: " << truthPionVertexMomentum << std::endl;
-    if (bVerbose) std::cout << "Pion initial energy: " << truthPionInitialEnergy << ", pion vertex energy: " << truthPionVertexEnergy << std::endl;
-    if (bVerbose) std::cout << std::endl;
-}
-
-void RecoEval::fillProtonDaughtersTruthData(std::vector<simb::MCParticle*> daughterProtons) {
-    for (simb::MCParticle *proton : daughterProtons) {
-        unsigned int protonTrackBegin = firstPointInTPC(proton);
-        unsigned int protonTrackEnd   = lastPointInTPC(proton);
-
-        truthProtonsEnergy.push_back(proton->E(protonTrackBegin));
-        truthProtonsKEnergy.push_back(proton->E(protonTrackBegin) - ProtonMass);
-        truthProtonsInitialMomentum.push_back(proton->P(protonTrackBegin));
-        truthProtonsInitialPx.push_back(proton->Px(protonTrackBegin));
-        truthProtonsInitialPy.push_back(proton->Px(protonTrackBegin));
-        truthProtonsInitialPz.push_back(proton->Px(protonTrackBegin));
-        truthProtonsLength.push_back(trackMagnitude(proton, protonTrackBegin, protonTrackEnd));
-
-        truthProtonsEndX.push_back(proton->Vx(proton->NumberTrajectoryPoints()));
-        truthProtonsEndY.push_back(proton->Vy(proton->NumberTrajectoryPoints()));
-        truthProtonsEndZ.push_back(proton->Vz(proton->NumberTrajectoryPoints()));
-
-        if (bVerbose) std::cout << "Filled information for proton with id: " << proton->TrackId() << std::endl;
-    }
-    if (bVerbose) std::cout << std::endl;
 }
 
 unsigned int RecoEval::lastPointInTPC(simb::MCParticle *track)
@@ -1126,29 +943,118 @@ bool RecoEval::isWithinActiveVolume(double x, double y, double z) {
     return true;
 }
 
-bool RecoEval::isInReducedVolume(simb::MCParticle *track) {
+bool RecoEval::isWithinReducedVolume(simb::MCParticle *track) {
     return (
       (track->EndX()>RminX) && (track->EndX()<RmaxX) && 
       (track->EndY()>RminY) && (track->EndY()<RmaxY) && 
       (track->EndZ()>RminZ) && (track->EndZ()<RmaxZ)
     );
-  }
+}
+
+bool RecoEval::isWithinReducedVolume(double x, double y, double z) {
+    return (
+        (x > RminX) && (x < RmaxX) && 
+        (y > RminY) && (y < RmaxY) && 
+        (z > RminZ) && (z < RmaxZ)
+    );
+}
+
+void RecoEval::fillSignalInformation(
+    int pdg,
+    float vx, float vy, float vz,
+    std::vector<int> daughtersPDG, 
+    std::vector<std::string> daughtersProcess, 
+    std::vector<double> daughtersKE
+) {
+    bool isPionAbsorptionSignalTemp = true;
+
+    if (pdg != -211) isPionAbsorptionSignalTemp = false;
+    if (!isWithinReducedVolume(vx, vy, vz)) isPionAbsorptionSignalTemp = false;
+
+    int numDaughters = daughtersPDG.size();
+    int tempNumProtons = 0;
+    for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
+        if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
+        if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) isPionAbsorptionSignalTemp = false;
+        if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) isPionAbsorptionSignalTemp = false;
+
+        if (daughtersProcess[iDaughter] == "pi-Inelastic") {
+            if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { isPionAbsorptionSignalTemp = false; } // muon
+            else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { isPionAbsorptionSignalTemp = false; } // kaon
+            else if (daughtersPDG[iDaughter] == 2212) {
+                if ((daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND) && (daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND)) {
+                    tempNumProtons++;
+                }
+            }
+        }
+    }
+
+    if (isPionAbsorptionSignalTemp) {
+        // Event is signal!
+        numVisibleProtons      = tempNumProtons;
+        isPionAbsorptionSignal = true;
+    } else {
+        // Event is background, classify it
+        fillBackgroundInformation(
+            pdg,
+            vx, vy, vz,
+            daughtersPDG,
+            daughtersProcess,
+            daughtersKE
+        );
+    }
+
+    return;
+}
+
+void RecoEval::fillBackgroundInformation(
+    int pdg,
+    float vx, float vy, float vz,
+    std::vector<int> daughtersPDG, 
+    std::vector<std::string> daughtersProcess, 
+    std::vector<double> daughtersKE
+) {
+    if (pdg != -211) {
+        if (pdg == 13) { backgroundType = 2; }
+        else if (pdg == 11) { backgroundType = 3; }
+        else { backgroundType = 4; }
+        return; 
+    } 
+
+    int numDaughters = daughtersPDG.size();
+    int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0;
+    for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
+        if (daughtersPDG[iDaughter] == -211) {
+            numNegativePions++; 
+        } else if (daughtersPDG[iDaughter] == 111) {
+            numNeutralPions++;
+        } else if (daughtersPDG[iDaughter] == 211) {
+            numPositivePions++;
+        } else if (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest") {
+            backgroundType = 9; return;
+        } else if (daughtersProcess[iDaughter] == "Decay") {
+            backgroundType = 10; return;
+        }
+    }
+
+    if ((numNegativePions + numNeutralPions + numPositivePions) > 0) {
+        if ((numNegativePions == 1) && (numNeutralPions == 0) && (numPositivePions == 0)) {
+            backgroundType = 6;
+        } else if ((numNegativePions == 0) && (numNeutralPions == 1) && (numPositivePions == 0)) {
+            backgroundType = 7;
+        } else if ((numNegativePions == 0) && (numNeutralPions == 0) && (numPositivePions == 1)) {
+            backgroundType = 8;
+        }
+    }
+
+    // Only flag as outside reduced volume if it is not anything else
+    if ((backgroundType == -1) && (!isWithinReducedVolume(vx, vy, vz))) { backgroundType = 5; return; }
+
+    // If not flagged at this point, label as other
+    if (backgroundType == -1) backgroundType = 11;
+}
 
 void RecoEval::resetTree() {
-    numDaughterProtons = 0;
-    numDaughterNeutrons = 0;
-    
-    truthProtonsEnergy.clear();
-    truthProtonsKEnergy.clear();
-    truthProtonsInitialMomentum.clear();
-    truthProtonsInitialPx.clear();
-    truthProtonsInitialPy.clear();
-    truthProtonsInitialPz.clear();
-    truthProtonsLength.clear();
-    truthProtonsEndX.clear();
-    truthProtonsEndY.clear();
-    truthProtonsEndZ.clear();
-
     isTrackInverted.clear();
     recoBeginX.clear();
     recoBeginY.clear();
@@ -1184,8 +1090,6 @@ void RecoEval::resetTree() {
     matchedEndingPx.clear();
     matchedEndingPy.clear();
     matchedEndingPz.clear();
-
-    matchedIsPosterityProton.clear();
     
     recoPitch.clear();
     recoDEDX.clear();
@@ -1193,10 +1097,6 @@ void RecoEval::resetTree() {
     recoResR.clear();
     recoZPos.clear();
     recoMeanDEDX.clear();
-
-    isPrimaryPionReco = false;
-    hasBrokenPionTrack = false;
-    distancePrimaryPionOtherPion.clear();
 }
 
 void RecoEval::endJob() {
@@ -1213,6 +1113,8 @@ void RecoEval::reconfigure(fhicl::ParameterSet const & p) {
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
     MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
     TrackStitchingThreshold            = p.get<double> ("TrackStitchingThreshold",4);
+    PROTON_ENERGY_LOWER_BOUND          = p.get<float>("ProtonEnergyLowerBound", 0.075);
+    PROTON_ENERGY_UPPER_BOUND          = p.get<float>("ProtonEnergyUpperBound", 1.0);
 }
 
 DEFINE_ART_MODULE(RecoEval)

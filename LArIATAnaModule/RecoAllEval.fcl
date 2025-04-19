@@ -1,11 +1,11 @@
 #include "services_lariat.fcl"
 #include "recomcparticlematching.fcl"
 
-process_name: RecoEval
+process_name: RecoAllEval
 
 services: {
     # Load the service that manages root files for histograms.
-    TFileService: { fileName: "RecoEval_histo.root" }
+    TFileService: { fileName: "RecoAllEval_histo.root" }
     #@table::standard_resourcetrackers
     RandomNumberGenerator: {} #ART native random number generator
     #message:      @local::lariat_message_services
@@ -27,16 +27,18 @@ physics: {
     }
 
     analyzers: {
-        RecoEval: {
-            module_type: "RecoEval"
-            Verbose: false
-            WCTrackBuilderLabel: wctrack
-            TPCTrackHandleLabel: pmtrack
-            WC2TPModuleLabel: wctracktpctrackmatch
-            CalorimetryModuleLabel: calo
-            SimulationLabel: largeant
-            RecoTrackMCMatchLabel: recotrackmcmatching
+        RecoAllEval: {
+            module_type:              "RecoAllEval"
+            Verbose:                  false
+            WCTrackBuilderLabel:      wctrack
+            TPCTrackHandleLabel:      pmtrack
+            WC2TPModuleLabel:         wctracktpctrackmatch
+            CalorimetryModuleLabel:   calo
+            SimulationLabel:          largeant
+            RecoTrackMCMatchLabel:    recotrackmcmatching
             MeanDEDXNumberTrajPoints: 20
+            ProtonEnergyLowerBound:   0.075
+            ProtonEnergyUpperBound:   1.0
         }
     }
 
@@ -44,7 +46,7 @@ physics: {
     #filters reject all following items.  see lines starting physics.producers below
 
     reco: [ recotrackmcmatching ]
-    ana: [ RecoEval ]
+    ana: [ RecoAllEval ]
 
     stream1: [ out1 ]
 

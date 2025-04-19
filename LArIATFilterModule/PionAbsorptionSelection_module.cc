@@ -1188,18 +1188,17 @@ double PionAbsorptionSelection::meanDEDX(art::FindManyP<anab::Calorimetry> fmcal
             if (bVerbose) std::cout << "Filled calorimetry vectors" << std::endl;
             if (isThisTrackReversed) {
                 std::reverse(recoResR_v.begin(), recoResR_v.end());
+                std::reverse(recoDEDX_v.begin(), recoDEDX_v.end());
             }
         } // end loop over planes
     }
 
     // Compute and save mean dedx
     double meanDEDX = 0;
-    unsigned int bound = 0;
-    if (recoDEDX_v.size() > MeanDEDXNumberTrajPoints) {
-        bound = (int)(recoDEDX_v.size() - MeanDEDXNumberTrajPoints);
-    }
-    for (unsigned int i = bound; i < recoDEDX_v.size(); ++i) meanDEDX += recoDEDX_v.at(i);
-    meanDEDX /= (recoDEDX_v.size() - bound);
+    unsigned int bound = MeanDEDXNumberTrajPoints;
+    if (MeanDEDXNumberTrajPoints > recoDEDX_v.size()) bound = recoDEDX_v.size();
+    for (unsigned int i = 0; i < bound; ++i) meanDEDX += recoDEDX_v.at(i);
+    meanDEDX /= bound;
     
     return meanDEDX;
 }
