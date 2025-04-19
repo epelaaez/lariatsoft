@@ -60,7 +60,7 @@ physics: {
 outputs: {
     out1: {
         module_type: RootOutput
-        fileName: "RecoEval_out.root" # default file name, can override from command line with -o or --output
+        fileName: "RecoAllEval_out.root" # default file name, can override from command line with -o or --output
     }
 }
 
