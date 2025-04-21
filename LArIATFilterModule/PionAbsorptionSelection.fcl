@@ -37,7 +37,7 @@ physics: {
             SimulationLabel:          largeant 
             RecoTrackMCMatchLabel:    recotrackmcmatching
             MeanDEDXNumberTrajPoints: 20
-            MeanDEDXThreshold:        4.0
+            MeanDEDXThreshold:        5.0
             VertexRadius:             4
             SmallTrackLength:         35
             MaxSmallTracks:           5
