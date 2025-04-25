@@ -688,7 +688,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
 
             // Reject events with outgoing pions
             double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed);
-            if (thisMeanDEDX < fMeanDEDXThreshold) {
+            if (thisMeanDEDX <= fMeanDEDXThreshold) {
                 // TODO: pion stitching?
                 return false;
             }
@@ -800,7 +800,7 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
 
     MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
-    fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 4.0);
+    fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 5.0);
     fVertexRadius                      = p.get<double>("VertexRadius", 4);
     SmallTrackLength                   = p.get<double>("SmallTrackLength", 35);
     MaxSmallTracks                     = p.get<int>("MaxSmallTracks", 5);
