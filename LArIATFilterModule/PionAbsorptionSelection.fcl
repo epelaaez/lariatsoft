@@ -44,6 +44,10 @@ physics: {
             MeanCurvatureThreshold:   0.015
             ProtonEnergyLowerBound:   0.075
             ProtonEnergyUpperBound:   1.0
+            PionChi2PionValue:        3.0
+            PionChi2ProtonValue:      1.0
+            ProtonChi2PionValue:      3.0
+            ProtonChi2ProtonValue:    4.0
         }
     }
     

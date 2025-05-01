@@ -236,11 +236,16 @@ class PionAbsorptionSelection : public art::EDFilter {
         bool         bVerbose;
         unsigned int MeanDEDXNumberTrajPoints;
         double       fVertexRadius;
+        double       fMeanDEDXThreshold;
         double       SmallTrackLength;
         int          MaxSmallTracks;
         double       MeanCurvatureThreshold;
         float        PROTON_ENERGY_LOWER_BOUND;
         float        PROTON_ENERGY_UPPER_BOUND;
+        double       PION_CHI2_PION_VALUE;
+        double       PION_CHI2_PROTON_VALUE;
+        double       PROTON_CHI2_PION_VALUE;
+        double       PROTON_CHI2_PROTON_VALUE;
 
         // For chi^2 cuts
         TGraph* gProton = new TGraph();
@@ -290,9 +295,6 @@ class PionAbsorptionSelection : public art::EDFilter {
         TH1D* hFinalRecoEventsNpSignal;
         TH1D* hFinalRecoEvents0pBackground;
         TH1D* hFinalRecoEventsNpBackground;
-
-        // Cut variables
-        double fMeanDEDXThreshold;
 
         // Output tree
         TTree* PionAbsTree;
@@ -572,7 +574,7 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
         hWCExistsBackground->Fill(backgroundType);
 
         // Identify pion among reco tracks
-        for (size_t trk_idx = 0; trk_idx < tpcTrackHandle -> size(); ++trk_idx) {
+        for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
             auto thisTrack = tracklist.at(trk_idx);
             recob::TrackTrajectory::Point_t recoWC2TPCBeginning;
             recob::TrackTrajectory::Point_t recoWC2TPCEnd;
@@ -704,15 +706,27 @@ bool PionAbsorptionSelection::filter(art::Event &e) {
             double protonChi2 = computeReducedChi2(gProton, thisTrackResR, thisTrackDEDX, caloPoints);
             double pionChi2   = computeReducedChi2(gPion, thisTrackResR, thisTrackDEDX, caloPoints);
 
-            // Reject events with outgoing pions
-            if (thisMeanDEDX <= fMeanDEDXThreshold) {
-                // TODO: pion stitching?
+            // Classify track as either pion or proton with chi^2
+            if ((pionChi2 < PION_CHI2_PION_VALUE) && (protonChi2 > PROTON_CHI2_PION_VALUE)) {
+                // Tagged as pion
+                return false;
+            } else if ((pionChi2 > PION_CHI2_PROTON_VALUE) && (protonChi2 < PROTON_CHI2_PROTON_VALUE)) {
+                // Tagged as proton, allow
+            } else {
+                // Not tagged as either
                 return false;
             }
 
+            // // Classify track as either pion or proton with mean dE/dx
+            // // Reject events with outgoing pions
+            // if (thisMeanDEDX <= fMeanDEDXThreshold) {
+            //     // TODO: pion stitching?
+            //     return false;
+            // }
+
             // If we will accept this proton, we want truth information about its
             // mother particle and the process that generated the particle
-            std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trk_idx);
+            std::vector<art::Ptr<simb::MCParticle>> const& particles               = find_many_mcparticles_from_tracks.at(trk_idx);
             std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
 
             std::string protonProcess = "";
@@ -816,14 +830,18 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     simulation_producer_label_         = p.get<std::string>("SimulationLabel", "largeant");
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
 
-    MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
-    fMeanDEDXThreshold                 = p.get<double>("MeanDEDXThreshold", 5.0);
-    fVertexRadius                      = p.get<double>("VertexRadius", 4);
-    SmallTrackLength                   = p.get<double>("SmallTrackLength", 35);
-    MaxSmallTracks                     = p.get<int>("MaxSmallTracks", 5);
-    MeanCurvatureThreshold             = p.get<double>("MeanCurvatureThreshold", 0.015);
-    PROTON_ENERGY_LOWER_BOUND          = p.get<float>("ProtonEnergyLowerBound", 0.075);
-    PROTON_ENERGY_UPPER_BOUND          = p.get<float>("ProtonEnergyUpperBound", 1.0);
+    MeanDEDXNumberTrajPoints  = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
+    fMeanDEDXThreshold        = p.get<double>("MeanDEDXThreshold", 5.0);
+    fVertexRadius             = p.get<double>("VertexRadius", 4);
+    SmallTrackLength          = p.get<double>("SmallTrackLength", 35);
+    MaxSmallTracks            = p.get<int>("MaxSmallTracks", 5);
+    MeanCurvatureThreshold    = p.get<double>("MeanCurvatureThreshold", 0.015);
+    PROTON_ENERGY_LOWER_BOUND = p.get<float>("ProtonEnergyLowerBound", 0.075);
+    PROTON_ENERGY_UPPER_BOUND = p.get<float>("ProtonEnergyUpperBound", 1.0);
+    PION_CHI2_PION_VALUE      = p.get<double>("PionChi2PionValue", 3.);
+    PION_CHI2_PROTON_VALUE    = p.get<double>("PionChi2ProtonValue", 1.);
+    PROTON_CHI2_PION_VALUE    = p.get<double>("ProtonChi2PionValue", 3.);
+    PROTON_CHI2_PROTON_VALUE  = p.get<double>("ProtonChi2ProtonValue", 4.);
 }
 
 void PionAbsorptionSelection::beginJob() {
@@ -1169,7 +1187,7 @@ double PionAbsorptionSelection::curvatureForThreePoints(TVector3 p1, TVector3 p2
     if (ww < 10e-14) return 0;
   
     return (2 * ww) / (tt * uu * vv);
-  }
+}
 
 double PionAbsorptionSelection::meanDEDX(
     art::FindManyP<anab::Calorimetry> fmcal, 
