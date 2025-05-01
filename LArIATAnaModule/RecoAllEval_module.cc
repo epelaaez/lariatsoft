@@ -219,10 +219,15 @@ class RecoEval : public art::EDAnalyzer {
         bool isWithinActiveVolume(double x, double y, double z);
         bool isWithinReducedVolume(double x, double y, double z);
         bool isWithinReducedVolume(simb::MCParticle *track);
-
-        // Get data about event signature
+        double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed, std::vector<double>& trackDEDX, std::vector<double>& trackResR);
+        double distance(double x1, double x2, double y1, double y2, double z1, double z2);
+        double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
+        std::tuple<double, double> computeCurvature(recob::Track track);
         void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
         void fillBackgroundInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void initializeProtonPoints(TGraph *gProton);
+        void initializePionPoints(TGraph *gPion);
+        double computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints);
 
     private: 
         // Produce's names
@@ -237,8 +242,21 @@ class RecoEval : public art::EDAnalyzer {
         bool         bVerbose;
         unsigned int MeanDEDXNumberTrajPoints;
         double       TrackStitchingThreshold;
+        double       fMeanDEDXThreshold;
+        double       fVertexRadius;
+        double       SmallTrackLength;
+        int          MaxSmallTracks;
+        double       MeanCurvatureThreshold;
         float        PROTON_ENERGY_LOWER_BOUND;
         float        PROTON_ENERGY_UPPER_BOUND;
+        double       PION_CHI2_PION_VALUE;
+        double       PION_CHI2_PROTON_VALUE;
+        double       PROTON_CHI2_PION_VALUE;
+        double       PROTON_CHI2_PROTON_VALUE;
+
+        // For chi^2 cuts
+        TGraph* gProton = new TGraph();
+        TGraph* gPion   = new TGraph();
 
         // Output tree
         TTree *RecoEvalTree;
@@ -251,6 +269,12 @@ class RecoEval : public art::EDAnalyzer {
         // Signal information
         bool isPionAbsorptionSignal;
         int  numVisibleProtons;
+
+        // Cut information
+        bool passesPionInRedVolume;
+        bool passesNoOutgoingPion;
+        bool passesSmallTracksCut;
+        bool passesMeanCurvatureCut;
 
         // Background information
         int backgroundType; 
@@ -279,11 +303,16 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double>      truthPrimaryDaughtersKE;
 
         // WC variables
-        int WC2TPCtrkID;
+        int    WC2TPCtrkID;
         double WCTrackMomentum;
         double WC2TPCPrimaryBeginX;
         double WC2TPCPrimaryBeginY;
         double WC2TPCPrimaryBeginZ;
+        double WC2TPCPrimaryEndX;
+        double WC2TPCPrimaryEndY;
+        double WC2TPCPrimaryEndZ;
+        double WC2TPCPrimaryLength;
+
         double WC3PrimaryX;
         double WC3PrimaryY;
         double WC3PrimaryZ;
@@ -292,9 +321,20 @@ class RecoEval : public art::EDAnalyzer {
         double WC4PrimaryZ;
         double WCTheta;
         double WCPhi;
+        double WCMeanCurvature;
+        double WCMaxCurvature;
+
+        // Wire chamber match truth information
+        int                      wcMatchPDG;
+        std::string              wcMatchProcess = "";
+        std::vector<int>         wcMatchDaughtersPDG;
+        std::vector<std::string> wcMatchDaughtersProcess;
+        std::vector<double>      wcMatchResR;
+        std::vector<double>      wcMatchDEDX;
 
         // Reco variables
         std::vector<bool>   isTrackInverted;
+        std::vector<int>    recoTaggedAs;
         std::vector<double> recoBeginX;
         std::vector<double> recoBeginY;
         std::vector<double> recoBeginZ;
@@ -302,12 +342,17 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> recoEndY;
         std::vector<double> recoEndZ;
         std::vector<int>    recoTrkID;
+        std::vector<bool>   isTrackNearVertex;
+
+        int numTaggedAsPions;
+        int numTaggedAsProton;
+        int numNotTagged;
 
         // Truth variables for particles matched to tracks
-        std::vector<int>    matchedIdentity;
-        std::vector<double> matchedCleanliness;
-        std::vector<double> matchedCompleteness;
-        std::vector<int>    matchedTrkID;
+        std::vector<int>         matchedIdentity;
+        std::vector<double>      matchedCleanliness;
+        std::vector<double>      matchedCompleteness;
+        std::vector<int>         matchedTrkID;
         std::vector<std::string> matchedProcess;
 
         std::vector<double> matchedBeginX;
@@ -320,10 +365,8 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> matchedRealEndY;
         std::vector<double> matchedRealEndZ;
         std::vector<double> matchedLength;
-
         std::vector<double> matchedKEnergy;
         std::vector<double> matchedEndingKEnergy;
-
         std::vector<double> matchedInitialPx;
         std::vector<double> matchedInitialPy;
         std::vector<double> matchedInitialPz;
@@ -332,12 +375,9 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> matchedEndingPz;
         
         // Calorimetry variables for tracks
-        std::vector<std::vector<double>> recoPitch;
         std::vector<std::vector<double>> recoDEDX;
-        std::vector<std::vector<double>> recoEDep;
         std::vector<std::vector<double>> recoResR;
-        std::vector<std::vector<double>> recoZPos;
-        std::vector<double> recoMeanDEDX;
+        std::vector<double>              recoMeanDEDX;
 
         // Masses
         const double PionMass    = .13957018;    // in GeV
@@ -356,7 +396,7 @@ class RecoEval : public art::EDAnalyzer {
         const double RminX =  5.0;
         const double RmaxX = 42.0;
         const double RminY =-15.0; 
-        const double RmaxY = 15.0; 
+        const double RmaxY = 15.0;
         const double RminZ =  8.0;
         const double RmaxZ = 82.0;
 };
@@ -391,7 +431,7 @@ void RecoEval::analyze(art::Event const &e) {
         particle_map[particle->TrackId()] = particle;
     }
 
-    // Identify true-level primary pion and get its information
+    // Identify true-level primary particle and get its information
     std::vector<int> primaryDaughtersIDs;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
@@ -441,14 +481,14 @@ void RecoEval::analyze(art::Event const &e) {
 
     // Get wcTrack momentum
     WCTrackMomentum = wctrack[0]->Momentum() * 0.001; // Mev to GeV
-    WC3PrimaryX = wctrack[0]->HitPosition(2,0);
-    WC3PrimaryY = wctrack[0]->HitPosition(2,1);
-    WC3PrimaryZ = wctrack[0]->HitPosition(2,2);
-    WC4PrimaryX = wctrack[0]->HitPosition(3,0);
-    WC4PrimaryY = wctrack[0]->HitPosition(3,1);
-    WC4PrimaryZ = wctrack[0]->HitPosition(3,2);
-    WCTheta     = wctrack[0]->Theta();
-    WCPhi       = wctrack[0]->Phi();
+    WC3PrimaryX     = wctrack[0]->HitPosition(2,0);
+    WC3PrimaryY     = wctrack[0]->HitPosition(2,1);
+    WC3PrimaryZ     = wctrack[0]->HitPosition(2,2);
+    WC4PrimaryX     = wctrack[0]->HitPosition(3,0);
+    WC4PrimaryY     = wctrack[0]->HitPosition(3,1);
+    WC4PrimaryZ     = wctrack[0]->HitPosition(3,2);
+    WCTheta         = wctrack[0]->Theta();
+    WCPhi           = wctrack[0]->Phi();
 
     if (bVerbose) std::cout << "WCTrackMomentum: " << WCTrackMomentum << std::endl;
     if (bVerbose) std::cout << std::endl;
@@ -509,10 +549,6 @@ void RecoEval::analyze(art::Event const &e) {
     // Get the backtracer to recover true quantities
     art::ServiceHandle<cheat::BackTrackerService> bt;
 
-    ////////////////////////////////////
-    // Truth matching using Johnny's Alg
-    ////////////////////////////////////
-
     // Define calorimetry
     art::FindManyP<anab::Calorimetry> fmcal(tpcTrackHandle, e, strCalorimetryModuleLabel);
 
@@ -520,234 +556,252 @@ void RecoEval::analyze(art::Event const &e) {
     const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
         find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
 
-    // Useful to order protons based on furthest-right pion track later on
-    double maxPrimaryEndZ    = -9999;
-    double primaryRecoEndX   = -9999;
-    double primaryRecoEndY   = -9999;
-    double primaryRecoEndZ   = -9999;
-    int primaryRecoTrackIndex = -9999;
+    
+    // Check that there is a WC to TPC match, and check if pion stops inside fiducial volume
+    if (WC2TPCtrkID != -99999) {
+        // Found match, now find track
+        for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
+            auto thisTrack = tracklist.at(trk_idx);
+            recob::TrackTrajectory::Point_t recoWC2TPCBeginning;
+            recob::TrackTrajectory::Point_t recoWC2TPCEnd;
 
-    // Do track matching
-    for (int particleSpeciesIndex = 0; particleSpeciesIndex <= 2; particleSpeciesIndex++) {
-        // This first loop goes over the types of particle that we want to match in order of
-        // their priority: primary, protons, everything else
+            if (thisTrack->ID() == WC2TPCtrkID) {
+                // Get curvature
+                auto [meanCurvature, maxCurvature] = computeCurvature(*thisTrack);
+                WCMeanCurvature = meanCurvature;
+                WCMaxCurvature  = maxCurvature;
 
-        for (size_t trkIdx = 0; trkIdx < tpcTrackHandle->size(); ++trkIdx) {
-            // Now, we loop over the TPC tracks
-
-            // Get MCParticle objects and metadata
-            std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trkIdx);
-            std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trkIdx);
-
-            // If reco track is not matched to anything, continue
-            if (btdata_vector.size() == 0) continue;
-
-            // Get MCParticle object and data
-            auto const& particle = particles.front();
-            int const pdg_code   = particle->PdgCode();
-            int const g4_trk_id  = particle->TrackId();
-            std::string process  = particle->Process();
-
-            // Get TPC track
-            auto thisTrack = tracklist.at(trkIdx);
-
-            // Matching priority
-            if ((pdg_code != -211) && (particleSpeciesIndex == 0)) continue;
-            if ((pdg_code != 2212) && (particleSpeciesIndex == 1)) continue;
-            if (((pdg_code == -211) || (pdg_code == 2212)) && (particleSpeciesIndex == 2)) continue;
-
-            // Get cleanliness/completeness of track from metadata
-            if (bVerbose) std::cout << "Cleanliness * completeness of matched tracks:" << std::endl;
-            for (unsigned int i = 0; i < btdata_vector.size(); ++i) {
-                double this_cleanliness = btdata_vector[i]->cleanliness;
-                double this_completeness = btdata_vector[i]->completeness;
-                if (bVerbose) std::cout << this_cleanliness * this_completeness << std::endl;
-            }
-            if (bVerbose) std::cout << std::endl;
-
-            double const cleanliness  = btdata_vector.front()->cleanliness;
-            double const completeness = btdata_vector.front()->completeness;
-
-            // At this point, we have:
-            //     particle: matched MCParticle
-            //     thisTrack: reconstructed track
-
-            recob::TrackTrajectory::Point_t recoBeginning;
-            recob::TrackTrajectory::Point_t recoEnd;
-
-            bool isThisTrackReversed = false;
-
-            // Check that interactino is inside the TPC
-            auto partTrackBegin = firstPointInTPC(particle);
-            auto partTrackEnd   = lastPointInTPC(particle);
-            if (partTrackBegin == 9999 || partTrackEnd == 9999) continue;
-
-            // Pion matching and ordering
-            if (particleSpeciesIndex == 0) {
-                // Check if track is reversed
+                // Reverse primary if needed 
+                bool isPrimaryReversed = false;
                 if ((thisTrack->Start()).Z() < (thisTrack->End()).Z()) {
-                    recoBeginning = thisTrack->Start();
-                    recoEnd       = thisTrack->End();
+                    recoWC2TPCBeginning = thisTrack->Start();
+                    recoWC2TPCEnd = thisTrack->End();
                 } else {
-                    recoEnd       = thisTrack->Start();
-                    recoBeginning = thisTrack->End();
-                    isThisTrackReversed = true;
+                    recoWC2TPCEnd = thisTrack->Start();
+                    recoWC2TPCBeginning = thisTrack->End();
+                    isPrimaryReversed = true;
                 }
 
-                if (recoEnd.Z() > maxPrimaryEndZ) {
-                    maxPrimaryEndZ  = recoEnd.Z();
-                    primaryRecoEndX = recoEnd.X();
-                    primaryRecoEndY = recoEnd.Y();
-                    primaryRecoEndZ = recoEnd.Z();
-                }
-            } // end pion matching
+                // Grab primary position data
+                WC2TPCPrimaryBeginX = recoWC2TPCBeginning.X();
+                WC2TPCPrimaryBeginY = recoWC2TPCBeginning.Y();
+                WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();
+                WC2TPCPrimaryEndX   = recoWC2TPCEnd.X();
+                WC2TPCPrimaryEndY   = recoWC2TPCEnd.Y();
+                WC2TPCPrimaryEndZ   = recoWC2TPCEnd.Z();
+                WC2TPCPrimaryLength = thisTrack->Length();
 
-            // Proton matching and ordering
-            if (particleSpeciesIndex == 1) {
-                if (sqrt(
-                    pow((thisTrack->Start()).X() - primaryRecoEndX, 2) + 
-                    pow((thisTrack->Start()).Y() - primaryRecoEndY, 2) + 
-                    pow((thisTrack->Start()).Z() - primaryRecoEndZ, 2)
-                ) < sqrt(
-                    pow((thisTrack->End()).X() - primaryRecoEndX, 2) + 
-                    pow((thisTrack->End()).Y() - primaryRecoEndY, 2) + 
-                    pow((thisTrack->End()).Z() - primaryRecoEndZ, 2)
-                )) {
-                    isThisTrackReversed = false;
-                    recoBeginning       = thisTrack->Start();
-                    recoEnd             = thisTrack->End();
+                // Get calo data
+                std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR;
+                double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isPrimaryReversed, thisTrackDEDX, thisTrackResR);
+                wcMatchResR = thisTrackResR; wcMatchDEDX = thisTrackDEDX;
+
+                // Check primary track is inside reduced volume
+                if (!(isWithinReducedVolume(WC2TPCPrimaryEndX, WC2TPCPrimaryEndY, WC2TPCPrimaryEndZ))) {
+                    if (thisMeanDEDX > fMeanDEDXThreshold) {
+                        // What to do with these??
+                        passesPionInRedVolume = true;
+                    } else {
+                        passesPionInRedVolume = false;
+                    }
                 } else {
-                    isThisTrackReversed = true;
-                    recoBeginning       = thisTrack->End();
-                    recoEnd             = thisTrack->Start();
+                    passesPionInRedVolume = true;
                 }
-            } // end proton matching
 
-            isTrackInverted.push_back(isThisTrackReversed);
+                std::vector<art::Ptr<simb::MCParticle>> const& particles               = find_many_mcparticles_from_tracks.at(trk_idx);
+                std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
+                
+                auto const& particle = particles.front();
+                wcMatchPDG           = particle->PdgCode();
+                wcMatchProcess       = particle->Process();
+                
+                // Get daughters IDs
+                std::vector<int> daughterIDs;
+                for (int i = 0; i < particle->NumberDaughters(); ++i) daughterIDs.push_back(particle->Daughter(i));
 
-            // Fill in data to vectors for tree
-            recoBeginX.push_back(recoBeginning.X());
-            recoBeginY.push_back(recoBeginning.Y());
-            recoBeginZ.push_back(recoBeginning.Z());
-            recoEndX.push_back(recoEnd.X());
-            recoEndY.push_back(recoEnd.Y());
-            recoEndZ.push_back(recoEnd.Z());
-            recoTrkID.push_back(thisTrack->ID());
+                for (size_t p = 0; p < plist.size(); ++p) {
+                    auto part = plist.Particle(p);
+                    if (std::find(daughterIDs.begin(), daughterIDs.end(), part->TrackId()) != daughterIDs.end()) {
+                        wcMatchDaughtersProcess.push_back(part->Process());
+                        wcMatchDaughtersPDG.push_back(part->PdgCode());
+                    }
+                }
+                break;
+            }
+        }
+    }
 
-            matchedIdentity.push_back(pdg_code);
-            matchedBeginX.push_back(particle->Vx(partTrackBegin));
-            matchedBeginY.push_back(particle->Vy(partTrackBegin));
-            matchedBeginZ.push_back(particle->Vz(partTrackBegin));
-            matchedEndX.push_back(particle->Vx(partTrackEnd));
-            matchedEndY.push_back(particle->Vy(partTrackEnd));
-            matchedEndZ.push_back(particle->Vz(partTrackEnd));
-            matchedRealEndX.push_back(particle->Vx(particle->NumberTrajectoryPoints()));
-            matchedRealEndY.push_back(particle->Vy(particle->NumberTrajectoryPoints()));
-            matchedRealEndZ.push_back(particle->Vz(particle->NumberTrajectoryPoints()));
-            matchedLength.push_back(trackMagnitude(particle, partTrackBegin, partTrackEnd));
+    int numSmallTracks    = 0;
+    for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
+        auto thisTrack = tracklist.at(trk_idx);
+        recob::TrackTrajectory::Point_t recoBeginning;
+        recob::TrackTrajectory::Point_t recoEnd;
 
-            // If particle ends in TPC, best end is two indices before actual last point
-            auto bestEnd = std::min(partTrackEnd, particle->NumberTrajectoryPoints() - 2);
+        // Continue if ID is that of matched beamline particle
+        if (thisTrack->ID() == WC2TPCtrkID) continue;
 
-            // Get energies depending on particle type
-            if (pdg_code == -211) {
-                matchedKEnergy.push_back(particle->E(partTrackBegin) - PionMass);
-                matchedEndingKEnergy.push_back(particle->E(bestEnd) - PionMass);
-            } else if (pdg_code == 2212) {
-                matchedKEnergy.push_back(particle->E(partTrackBegin) - ProtonMass);
-                matchedEndingKEnergy.push_back(particle->E(bestEnd) - ProtonMass);
+        bool isThisTrackReversed = false;
+
+        // Order track
+        double startDistance = distance(thisTrack->Start().X(), WC2TPCPrimaryEndX, thisTrack->Start().Y(), WC2TPCPrimaryEndY, thisTrack->Start().Z(), WC2TPCPrimaryEndZ);             
+        double endDistance = distance(thisTrack->End().X(), WC2TPCPrimaryEndX, thisTrack->End().Y(), WC2TPCPrimaryEndY, thisTrack->End().Z(), WC2TPCPrimaryEndZ);
+
+        if (startDistance < endDistance) {
+            recoBeginning = thisTrack->Start();
+            recoEnd = thisTrack->End();
+        } else {
+            isThisTrackReversed = true;
+            recoBeginning = thisTrack->End();
+            recoEnd = thisTrack->Start();
+        }
+
+        // Check if track counts towards count of small tracks
+        double thisTrackLength = sqrt(
+            pow(recoBeginning.X() - recoEnd.X(), 2) +
+            pow(recoBeginning.Y() - recoEnd.Y(), 2) + 
+            pow(recoBeginning.Z() - recoEnd.Z(), 2)
+        );
+        if (thisTrackLength < SmallTrackLength) numSmallTracks++;
+
+        // Calo data
+        std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR;
+        double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed, thisTrackDEDX, thisTrackResR);
+        recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoMeanDEDX.push_back(thisMeanDEDX);
+
+        // Find tracks near vertex
+        bool thisTrackNearVertex = false;
+        if ((startDistance < fVertexRadius) || (endDistance < fVertexRadius)) {
+            thisTrackNearVertex = true;
+
+            // Get chi^2 values
+            int    caloPoints = thisTrackDEDX.size(); 
+            double protonChi2 = computeReducedChi2(gProton, thisTrackResR, thisTrackDEDX, caloPoints);
+            double pionChi2   = computeReducedChi2(gPion, thisTrackResR, thisTrackDEDX, caloPoints);
+
+            // Classify track as either pion or proton with chi^2
+            if ((pionChi2 < PION_CHI2_PION_VALUE) && (protonChi2 > PROTON_CHI2_PION_VALUE)) {
+                // Tagged as pion
+                recoTaggedAs.push_back(0);
+                numTaggedAsPions++;
+            } else if ((pionChi2 > PION_CHI2_PROTON_VALUE) && (protonChi2 < PROTON_CHI2_PROTON_VALUE)) {
+                // Tagged as proton
+                recoTaggedAs.push_back(1);
+                numTaggedAsProton++;
             } else {
-                matchedKEnergy.push_back(particle->E(partTrackBegin) - particle->Mass());
-                matchedEndingKEnergy.push_back(particle->E(bestEnd) - particle->Mass());
+                // Not tagged as either
+                recoTaggedAs.push_back(2);
+                numNotTagged++;
             }
 
-            matchedInitialPx.push_back(particle->Px(partTrackBegin));
-            matchedInitialPy.push_back(particle->Py(partTrackBegin));
-            matchedInitialPz.push_back(particle->Pz(partTrackBegin));
-            matchedEndingPx.push_back(particle->Px(bestEnd));
-            matchedEndingPy.push_back(particle->Py(bestEnd));
-            matchedEndingPz.push_back(particle->Pz(bestEnd));
+            // // Classify track as either pion or proton with mean dE/dx
+            // // Reject events with outgoing pions
+            // if (thisMeanDEDX <= fMeanDEDXThreshold) {
+            //     // TODO: pion stitching?
+            //     return false;
+            // }
+        } // end if track begins or ends near pion
+        else {
+            recoTaggedAs.push_back(-1);
+        }
 
-            matchedCompleteness.push_back(completeness);
-            matchedCleanliness.push_back(cleanliness);
-            matchedTrkID.push_back(g4_trk_id);
-            matchedProcess.push_back(process);
+        // Fill info about truth-matched particle
 
-            ////////////////////////
-            // Calorimetry 
-            // (still in track loop)
-            ////////////////////////
+        // Get MCParticle objects and metadata
+        std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trk_idx);
+        std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
 
-            if (bVerbose) std::cout << "Starting calorimetry" << std::endl;
+        isTrackInverted.push_back(isThisTrackReversed);
+        isTrackNearVertex.push_back(thisTrackNearVertex);
+        recoBeginX.push_back(recoBeginning.X());
+        recoBeginY.push_back(recoBeginning.Y());
+        recoBeginZ.push_back(recoBeginning.Z());
+        recoEndX.push_back(recoEnd.X());
+        recoEndY.push_back(recoEnd.Y());
+        recoEndZ.push_back(recoEnd.Z());
+        recoTrkID.push_back(thisTrack->ID());
 
-            std::vector<double> recoPitch_v; 
-            std::vector<double> recoDEDX_v;
-            std::vector<double> recoEDep_v;
-            std::vector<double> recoResR_v;
-            std::vector<double> recoZPos_v;
+        // If reco track is not matched to anything, add dummy values
+        if (btdata_vector.size() == 0) {
+            matchedIdentity.push_back(-99999);
+            matchedCleanliness.push_back(-99999);
+            matchedCompleteness.push_back(-99999);
+            matchedTrkID.push_back(-99999);
+            matchedProcess.push_back("");
+            matchedBeginX.push_back(-99999);
+            matchedBeginY.push_back(-99999);
+            matchedBeginZ.push_back(-99999);
+            matchedEndX.push_back(-99999);
+            matchedEndY.push_back(-99999);
+            matchedEndZ.push_back(-99999);
+            matchedRealEndX.push_back(-99999);
+            matchedRealEndY.push_back(-99999);
+            matchedRealEndZ.push_back(-99999);
+            matchedLength.push_back(-99999);
+            matchedKEnergy.push_back(-99999);
+            matchedEndingKEnergy.push_back(-99999);
+            matchedInitialPx.push_back(-99999);
+            matchedInitialPy.push_back(-99999);
+            matchedInitialPz.push_back(-99999);
+            matchedEndingPx.push_back(-99999);
+            matchedEndingPy.push_back(-99999);
+            matchedEndingPz.push_back(-99999);
+        }
 
-            // Check if calorimetry is valid 
-            if (fmcal.isValid()) {
-                if (bVerbose) std::cout << "fmcal is valid" << std::endl;
+        // Get MCParticle object and data
+        auto const& particle = particles.front();
+        int const pdg_code   = particle->PdgCode();
+        int const g4_trk_id  = particle->TrackId();
+        std::string process  = particle->Process();
 
-                // Get calorimetry for this track
-                std::vector<art::Ptr<anab::Calorimetry>> calos = fmcal.at(thisTrack.key());
-                
-                // Loop over calo data
-                for (size_t j = 0; j < calos.size(); ++j) {
-                    if (!calos[j]->PlaneID().isValid) continue;
-                    if (calos[j]->PlaneID().Plane == 0) continue; // Induction plane
+        double const cleanliness  = btdata_vector.front()->cleanliness;
+        double const completeness = btdata_vector.front()->completeness;
 
-                    if (bVerbose) std::cout << "Number of hits at plane " << j << ": " << calos[j]->dEdx().size() << std::endl;
-                    
-                    // Loop over hits in plane
-                    for (size_t k = 0; k < calos[j]->dEdx().size(); ++k) {
-                        // If the following happens, there is a mess in calorimetry module
-                        if (calos[j]->XYZ()[k].Z() < 0 || calos[j]->XYZ()[k].Z() > 90.) continue;
+        auto partTrackBegin = firstPointInTPC(particle);
+        auto partTrackEnd   = lastPointInTPC(particle);
+        auto bestEnd        = std::min(partTrackEnd, particle->NumberTrajectoryPoints() - 2);
 
-                        // If point not in active volume, continue
-                        if (!isWithinActiveVolume(calos[j]->XYZ()[k].X(), calos[j]->XYZ()[k].Y(), calos[j]->XYZ()[k].Z())) continue;
+        matchedIdentity.push_back(pdg_code);
+        matchedBeginX.push_back(particle->Vx(partTrackBegin));
+        matchedBeginY.push_back(particle->Vy(partTrackBegin));
+        matchedBeginZ.push_back(particle->Vz(partTrackBegin));
+        matchedEndX.push_back(particle->Vx(partTrackEnd));
+        matchedEndY.push_back(particle->Vy(partTrackEnd));
+        matchedEndZ.push_back(particle->Vz(partTrackEnd));
+        matchedRealEndX.push_back(particle->Vx(particle->NumberTrajectoryPoints()));
+        matchedRealEndY.push_back(particle->Vy(particle->NumberTrajectoryPoints()));
+        matchedRealEndZ.push_back(particle->Vz(particle->NumberTrajectoryPoints()));
+        matchedLength.push_back(trackMagnitude(particle, partTrackBegin, partTrackEnd));
+        matchedCompleteness.push_back(completeness);
+        matchedCleanliness.push_back(cleanliness);
+        matchedTrkID.push_back(g4_trk_id);
+        matchedProcess.push_back(process);
+        matchedInitialPx.push_back(particle->Px(partTrackBegin));
+        matchedInitialPy.push_back(particle->Py(partTrackBegin));
+        matchedInitialPz.push_back(particle->Pz(partTrackBegin));
+        matchedEndingPx.push_back(particle->Px(bestEnd));
+        matchedEndingPy.push_back(particle->Py(bestEnd));
+        matchedEndingPz.push_back(particle->Pz(bestEnd));
+        matchedKEnergy.push_back(particle->E(partTrackBegin) - particle->Mass());
+        matchedEndingKEnergy.push_back(particle->E(bestEnd) - particle->Mass());
+    }
+    
+    if (numTaggedAsPions > 0) {
+        passesNoOutgoingPion = false;
+    } else {
+        passesNoOutgoingPion = true;
+    }
 
-                        recoPitch_v.push_back(calos[j]->TrkPitchVec()[k]);
-                        recoDEDX_v.push_back(calos[j]->dEdx()[k]);
-                        recoEDep_v.push_back(calos[j]->dEdx()[k] * calos[j]->TrkPitchVec()[k]);
-                        recoResR_v.push_back(calos[j]->ResidualRange()[k]);
-                        recoZPos_v.push_back(calos[j]->XYZ()[k].Z());
-                    } // end loop on calo points
+    if (numSmallTracks > MaxSmallTracks) {
+        passesSmallTracksCut = false;
+    } else {
+        passesSmallTracksCut = true;
+    }
 
-                    if (bVerbose) std::cout << "Filled calorimetry vectors" << std::endl;
-                    if (isThisTrackReversed) {
-                        std::reverse(recoResR_v.begin(), recoResR_v.end());
-                        std::reverse(recoDEDX_v.begin(), recoDEDX_v.end());
-                    }
-                } // end loop over planes
-            } // end if calorimetry is valid
-
-            recoPitch.push_back(recoPitch_v);
-            recoDEDX.push_back(recoDEDX_v);
-            recoEDep.push_back(recoEDep_v);
-            recoResR.push_back(recoResR_v);
-            recoZPos.push_back(recoZPos_v);
-
-            // Compute and save mean dedx
-            double meanDEDX = 0;
-            unsigned int bound = MeanDEDXNumberTrajPoints;
-            if (MeanDEDXNumberTrajPoints > recoDEDX_v.size()) bound = recoDEDX_v.size();
-            for (unsigned int i = 0; i < bound; ++i) meanDEDX += recoDEDX_v.at(i);
-            meanDEDX /= bound;
-            recoMeanDEDX.push_back(meanDEDX);
-            if (bVerbose) std::cout << "Mean DEDX for track: " << meanDEDX << std::endl;
-            if (bVerbose) std::cout << std::endl;
-
-            // Clear inner vectors
-            recoPitch_v.clear();
-            recoDEDX_v.clear();
-            recoEDep_v.clear();
-            recoResR_v.clear();
-            recoZPos_v.clear();
-
-        } // end loop over tracks
-    } // end loop over particle species
+    if (WCMeanCurvature > MeanCurvatureThreshold) {
+        passesMeanCurvatureCut = false;
+    } else {
+        passesMeanCurvatureCut = true;
+    }
 
     if (bVerbose) std::cout << std::endl;
     RecoEvalTree->Fill();
@@ -755,8 +809,11 @@ void RecoEval::analyze(art::Event const &e) {
 
 void RecoEval::beginJob() {
     if (bVerbose) std::cout << "Beginning job." << std::endl;
-
     art::ServiceHandle<art::TFileService> tfs;
+
+    // Initialize chi^2 graphs
+    initializeProtonPoints(gProton);
+    initializePionPoints(gPion);
 
     // Make histograms and tree branches
     RecoEvalTree = tfs->make<TTree>("RecoEvalTree", "RecoEvalTree");
@@ -782,16 +839,32 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("WC2TPCPrimaryBeginX", &WC2TPCPrimaryBeginX, "WC2TPCPrimaryBeginX/D");
     RecoEvalTree->Branch("WC2TPCPrimaryBeginY", &WC2TPCPrimaryBeginY, "WC2TPCPrimaryBeginY/D");
     RecoEvalTree->Branch("WC2TPCPrimaryBeginZ", &WC2TPCPrimaryBeginZ, "WC2TPCPrimaryBeginZ/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryEndX", &WC2TPCPrimaryEndX, "WC2TPCPrimaryEndX/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryEndY", &WC2TPCPrimaryEndY, "WC2TPCPrimaryEndY/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryEndZ", &WC2TPCPrimaryEndZ, "WC2TPCPrimaryEndZ/D");
+    RecoEvalTree->Branch("WC2TPCPrimaryLength", &WC2TPCPrimaryLength, "WC2TPCPrimaryLength/D");
+
     RecoEvalTree->Branch("WC3PrimaryX", &WC3PrimaryX, "WC3PrimaryX/D");
     RecoEvalTree->Branch("WC3PrimaryY", &WC3PrimaryY, "WC3PrimaryY/D");
     RecoEvalTree->Branch("WC3PrimaryZ", &WC3PrimaryZ, "WC3PrimaryZ/D");
     RecoEvalTree->Branch("WC4PrimaryX", &WC4PrimaryX, "WC4PrimaryX/D");
     RecoEvalTree->Branch("WC4PrimaryY", &WC4PrimaryY, "WC4PrimaryY/D");
     RecoEvalTree->Branch("WC4PrimaryZ", &WC4PrimaryZ, "WC4PrimaryZ/D");
+    RecoEvalTree->Branch("WCMeanCurvature", &WCMeanCurvature, "WCMeanCurvature/D");
+    RecoEvalTree->Branch("WCMaxCurvature", &WCMaxCurvature, "WCMaxCurvature/D");
     RecoEvalTree->Branch("WCTheta", &WCTheta, "WCTheta/D");
     RecoEvalTree->Branch("WCPhi", &WCPhi, "WCPhi/D");
 
+    RecoEvalTree->Branch("wcMatchPDG", &wcMatchPDG, "wcMatchPDG/I");
+    RecoEvalTree->Branch("wcMatchProcess", "std::string", &wcMatchProcess);
+    RecoEvalTree->Branch("wcMatchDaughtersPDG", "std::vector<int>", &wcMatchDaughtersPDG);
+    RecoEvalTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
+    RecoEvalTree->Branch("wcMatchResR", "std::vector<double>", &wcMatchResR);
+    RecoEvalTree->Branch("wcMatchDEDX", "std::vector<double>", &wcMatchDEDX);
+
     RecoEvalTree->Branch("isTrackInverted", "std::vector<bool>", &isTrackInverted);
+    RecoEvalTree->Branch("isTrackNearVertex", "std::vector<bool>", &isTrackNearVertex);
+    RecoEvalTree->Branch("recoTaggedAs", "std::vector<int>", &recoTaggedAs);
     RecoEvalTree->Branch("recoBeginX", "std::vector<double>", &recoBeginX);
     RecoEvalTree->Branch("recoBeginY", "std::vector<double>", &recoBeginY);
     RecoEvalTree->Branch("recoBeginZ", "std::vector<double>", &recoBeginZ);
@@ -827,12 +900,18 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("matchedEndingPy", "std::vector<double>", &matchedEndingPy);
     RecoEvalTree->Branch("matchedEndingPz", "std::vector<double>", &matchedEndingPz);
 
-    RecoEvalTree->Branch("recoPitch","std::vector<std::vector<double>>",&recoPitch);
     RecoEvalTree->Branch("recoDEDX","std::vector<std::vector<double>>",&recoDEDX);
-    RecoEvalTree->Branch("recoEDep","std::vector<std::vector<double>>",&recoEDep);
     RecoEvalTree->Branch("recoResR","std::vector<std::vector<double>>",&recoResR);
-    RecoEvalTree->Branch("recoZPos","std::vector<std::vector<double>>",&recoZPos);
     RecoEvalTree->Branch("recoMeanDEDX","std::vector<double>",&recoMeanDEDX);
+
+    RecoEvalTree->Branch("passesPionInRedVolume", &passesPionInRedVolume, "passesPionInRedVolume/O");
+    RecoEvalTree->Branch("passesNoOutgoingPion", &passesNoOutgoingPion, "passesNoOutgoingPion/O");
+    RecoEvalTree->Branch("passesSmallTracksCut", &passesSmallTracksCut, "passesSmallTracksCut/O");
+    RecoEvalTree->Branch("passesMeanCurvatureCut", &passesMeanCurvatureCut, "passesMeanCurvatureCut/O");
+
+    RecoEvalTree->Branch("numTaggedAsPions", &numTaggedAsPions, "numTaggedAsPions/I");
+    RecoEvalTree->Branch("numTaggedAsProton", &numTaggedAsProton, "numTaggedAsProton/I");
+    RecoEvalTree->Branch("numNotTagged", &numNotTagged, "numTaggenumNotTaggeddAsPions/I");
 }
 
 unsigned int RecoEval::lastPointInTPC(simb::MCParticle *track)
@@ -904,6 +983,12 @@ bool RecoEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim::Parti
 
     // Recursion for mother
     return isPosterityOfPrimary(plist.Particle(motherPosition), plist);
+}
+
+double RecoEval::distance(double x1, double x2, double y1, double y2, double z1, double z2) {
+    return sqrt(
+        pow(x1 - x2, 2) + pow(y1 - y2, 2) + pow(z1 - z2, 2)
+    );
 }
 
 double RecoEval::trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2)
@@ -1003,7 +1088,6 @@ void RecoEval::fillSignalInformation(
             daughtersKE
         );
     }
-
     return;
 }
 
@@ -1054,7 +1138,203 @@ void RecoEval::fillBackgroundInformation(
     if (backgroundType == -1) backgroundType = 11;
 }
 
+std::tuple<double, double> RecoEval::computeCurvature(recob::Track track) {
+    double meanCurvature = 0;
+    double maxCurvature  = 0;
+    for (size_t iPoint = 0; iPoint < track.NPoints() - 2; iPoint++) {
+        recob::TrackTrajectory::Point_t p1_ = track.LocationAtPoint(iPoint);
+        recob::TrackTrajectory::Point_t p2_ = track.LocationAtPoint(iPoint + 1);
+        recob::TrackTrajectory::Point_t p3_ = track.LocationAtPoint(iPoint + 2);
+        TVector3 p1, p2, p3;
+        p1(0) = p1_.X(); p1(1) = p1_.Y(); p1(2) = p1_.Z();
+        p2(0) = p2_.X(); p2(1) = p2_.Y(); p2(2) = p2_.Z();
+        p3(0) = p3_.X(); p3(1) = p3_.Y(); p3(2) = p3_.Z();
+  
+        double curvatureAtPoint = curvatureForThreePoints(p1, p2, p3);
+        meanCurvature += curvatureAtPoint / (track.NPoints() - 2);
+        if (curvatureAtPoint > maxCurvature) maxCurvature = curvatureAtPoint;
+    }
+  
+    return std::make_tuple(meanCurvature, maxCurvature);
+}
+
+double RecoEval::curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3) {
+    // From: https://en.wikipedia.org/wiki/Circumcircle#Cartesian_coordinates_from_cross-_and_dot-products 
+  
+    // Edges of a triangle
+    TVector3 t = p1 - p2;
+    TVector3 u = p3 - p1;
+    TVector3 v = p2 - p3;
+  
+    // Normal to the triangle
+    TVector3 w = t.Cross(v);
+  
+    double tt = TMath::Sqrt(t * t);
+    double uu = TMath::Sqrt(u * u);
+    double vv = TMath::Sqrt(v * v);
+    double ww = TMath::Sqrt(w * w);
+  
+    // If area of triangle is too small, no curvature
+    if (ww < 10e-14) return 0;
+  
+    return (2 * ww) / (tt * uu * vv);
+}
+
+double RecoEval::meanDEDX(
+    art::FindManyP<anab::Calorimetry> fmcal, 
+    unsigned int trackKey, 
+    bool isThisTrackReversed,
+    std::vector<double>& trackDEDX,
+    std::vector<double>& trackResR
+) {
+    // Temporary storage for this reco track
+    std::vector<double> recoPitch_v; 
+    std::vector<double> recoDEDX_v;
+    std::vector<double> recoEDep_v;
+    std::vector<double> recoResR_v;
+    std::vector<double> recoZPos_v;
+
+    if (fmcal.isValid()) {
+        // Get calorimetry for this track
+        std::vector<art::Ptr<anab::Calorimetry>> calos = fmcal.at(trackKey);
+
+        // Loop over calo data
+        for (size_t j = 0; j < calos.size(); ++j) {
+            if (!calos[j]->PlaneID().isValid) continue;
+            if (calos[j]->PlaneID().Plane == 0) continue; // Induction plane
+
+            if (bVerbose) std::cout << "Number of hits at plane " << j << ": " << calos[j]->dEdx().size() << std::endl;
+            
+            // Loop over hits in plane
+            for (size_t k = 0; k < calos[j]->dEdx().size(); ++k) {
+                // If the following happens, there is a mess in calorimetry module
+                if (calos[j]->XYZ()[k].Z() < 0 || calos[j]->XYZ()[k].Z() > 90.) continue;
+
+                // If point not in active volume, continue
+                if (!isWithinActiveVolume(calos[j]->XYZ()[k].X(), calos[j]->XYZ()[k].Y(), calos[j]->XYZ()[k].Z())) continue;
+
+                recoPitch_v.push_back(calos[j]->TrkPitchVec()[k]);
+                recoDEDX_v.push_back(calos[j]->dEdx()[k]);
+                recoEDep_v.push_back(calos[j]->dEdx()[k] * calos[j]->TrkPitchVec()[k]);
+                recoResR_v.push_back(calos[j]->ResidualRange()[k]);
+                recoZPos_v.push_back(calos[j]->XYZ()[k].Z());
+            } // end loop on calo points
+
+            if (bVerbose) std::cout << "Filled calorimetry vectors" << std::endl;
+            if (isThisTrackReversed) {
+                std::reverse(recoResR_v.begin(), recoResR_v.end());
+                std::reverse(recoDEDX_v.begin(), recoDEDX_v.end());
+            }
+        } // end loop over planes
+    }
+
+    // Compute and save mean dedx
+    double meanDEDX = 0;
+    unsigned int bound = MeanDEDXNumberTrajPoints;
+    if (MeanDEDXNumberTrajPoints > recoDEDX_v.size()) bound = recoDEDX_v.size();
+    for (unsigned int i = 0; i < bound; ++i) meanDEDX += recoDEDX_v.at(i);
+    meanDEDX /= bound;
+
+    trackDEDX = recoDEDX_v;
+    trackResR = recoResR_v;
+    
+    return meanDEDX;
+}
+
+double RecoEval::computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints) {
+    double chi2 = 0.0;
+
+    for (int i = 0; i < nPoints; ++i) {
+        double theoryY = theory->Eval(xData[i]); // interpolate the theory at xData[i]
+        double deltaY = yData[i] - theoryY;
+        chi2 += (deltaY * deltaY) / theoryY;
+    }
+
+    // Currently, no fixed parameters, so dof = nPoints
+    int dof = nPoints;
+    return dof > 0 ? chi2 / dof : 0.0; 
+}
+
+void RecoEval::initializeProtonPoints(TGraph* gProton) {
+    double protonData[107][2] = {
+        {31.95, 4.14}, {31.65, 4.16}, {31.35, 4.17}, {31.05, 4.18}, {30.75, 4.20},
+        {30.45, 4.21}, {30.15, 4.23}, {29.85, 4.25}, {29.55, 4.26}, {29.25, 4.28},
+        {28.95, 4.29}, {28.65, 4.31}, {28.35, 4.33}, {28.05, 4.34}, {27.75, 4.36},
+        {27.45, 4.38}, {27.15, 4.40}, {26.85, 4.42}, {26.55, 4.43}, {26.25, 4.45},
+        {25.95, 4.47}, {25.65, 4.49}, {25.35, 4.51}, {25.05, 4.53}, {24.75, 4.55},
+        {24.45, 4.57}, {24.15, 4.60}, {23.85, 4.62}, {23.55, 4.64}, {23.25, 4.66},
+        {22.95, 4.69}, {22.65, 4.71}, {22.35, 4.73}, {22.05, 4.76}, {21.75, 4.78},
+        {21.45, 4.81}, {21.15, 4.83}, {20.85, 4.86}, {20.55, 4.89}, {20.25, 4.92},
+        {19.95, 4.94}, {19.65, 4.97}, {19.35, 5.00}, {19.05, 5.03}, {18.75, 5.07},
+        {18.45, 5.10}, {18.15, 5.13}, {17.85, 5.16}, {17.55, 5.20}, {17.25, 5.23},
+        {16.95, 5.27}, {16.65, 5.31}, {16.35, 5.35}, {16.05, 5.39}, {15.75, 5.43},
+        {15.45, 5.47}, {15.15, 5.51}, {14.85, 5.56}, {14.55, 5.60}, {14.25, 5.65},
+        {13.95, 5.70}, {13.65, 5.75}, {13.35, 5.80}, {13.05, 5.85}, {12.75, 5.91},
+        {12.45, 5.97}, {12.15, 6.03}, {11.85, 6.09}, {11.55, 6.15}, {11.25, 6.22},
+        {10.95, 6.29}, {10.65, 6.36}, {10.35, 6.44}, {10.05, 6.52}, {9.75, 6.60},
+        {9.45, 6.68}, {9.15, 6.77}, {8.85, 6.87}, {8.55, 6.97}, {8.25, 7.08},
+        {7.95, 7.19}, {7.65, 7.30}, {7.35, 7.43}, {7.05, 7.56}, {6.75, 7.70},
+        {6.45, 7.85}, {6.15, 8.02}, {5.85, 8.19}, {5.55, 8.38}, {5.25, 8.58},
+        {4.95, 8.81}, {4.65, 9.05}, {4.35, 9.32}, {4.05, 9.61}, {3.75, 9.94},
+        {3.45, 10.32}, {3.15, 10.74}, {2.85, 11.23}, {2.55, 11.80}, {2.25, 12.48},
+        {1.95, 13.31}, {1.65, 14.35}, {1.35, 15.71}, {1.05, 17.59}, {0.75, 20.44},
+        {0.45, 25.48}, {0.15, 38.12}
+    };
+
+    for (int i = 0; i < 107; ++i) {
+        gProton->SetPoint(i, protonData[i][0], protonData[i][1]);
+    }
+}
+
+void RecoEval::initializePionPoints(TGraph* gPion) {
+    double pionData[107][2] = {
+        {31.95, 2.4}, {31.65, 2.4}, {31.35, 2.4}, {31.05, 2.4}, {30.75, 2.4},
+        {30.45, 2.4}, {30.15, 2.4}, {29.85, 2.4}, {29.55, 2.4}, {29.25, 2.4},
+        {28.95, 2.4}, {28.65, 2.4}, {28.35, 2.4}, {28.05, 2.4}, {27.75, 2.5},
+        {27.45, 2.5}, {27.15, 2.5}, {26.85, 2.5}, {26.55, 2.5}, {26.25, 2.5},
+        {25.95, 2.5}, {25.65, 2.5}, {25.35, 2.5}, {25.05, 2.5}, {24.75, 2.5},
+        {24.45, 2.5}, {24.15, 2.5}, {23.85, 2.5}, {23.55, 2.5}, {23.25, 2.6},
+        {22.95, 2.6}, {22.65, 2.6}, {22.35, 2.6}, {22.05, 2.6}, {21.75, 2.6},
+        {21.45, 2.6}, {21.15, 2.6}, {20.85, 2.6}, {20.55, 2.6}, {20.25, 2.6},
+        {19.95, 2.6}, {19.65, 2.7}, {19.35, 2.7}, {19.05, 2.7}, {18.75, 2.7},
+        {18.45, 2.7}, {18.15, 2.7}, {17.85, 2.7}, {17.55, 2.7}, {17.25, 2.8},
+        {16.95, 2.8}, {16.65, 2.8}, {16.35, 2.8}, {16.05, 2.8}, {15.75, 2.8},
+        {15.45, 2.8}, {15.15, 2.9}, {14.85, 2.9}, {14.55, 2.9}, {14.25, 2.9},
+        {13.95, 2.9}, {13.65, 2.9}, {13.35, 3.0}, {13.05, 3.0}, {12.75, 3.0},
+        {12.45, 3.0}, {12.15, 3.0}, {11.85, 3.1}, {11.55, 3.1}, {11.25, 3.1},
+        {10.95, 3.1}, {10.65, 3.2}, {10.35, 3.2}, {10.05, 3.2}, {9.75, 3.3},
+        {9.45, 3.3}, {9.15, 3.3}, {8.85, 3.4}, {8.55, 3.4}, {8.25, 3.4},
+        {7.95, 3.5}, {7.65, 3.5}, {7.35, 3.6}, {7.05, 3.6}, {6.75, 3.7},
+        {6.45, 3.7}, {6.15, 3.8}, {5.85, 3.9}, {5.55, 3.9}, {5.25, 4.0},
+        {4.95, 4.1}, {4.65, 4.2}, {4.35, 4.3}, {4.05, 4.4}, {3.75, 4.6},
+        {3.45, 4.7}, {3.15, 4.9}, {2.85, 5.1}, {2.55, 5.3}, {2.25, 5.6},
+        {1.95, 5.9}, {1.65, 6.4}, {1.35, 6.9}, {1.05, 7.7}, {0.75, 8.9},
+        {0.45, 11.0}, {0.15, 16.5}
+    };
+
+    for (int i = 0; i < 107; ++i) {
+        gPion->SetPoint(i, pionData[i][0], pionData[i][1]);
+    }
+}
+
+
 void RecoEval::resetTree() {
+    numTaggedAsPions  = 0;
+    numTaggedAsProton = 0;
+    numNotTagged      = 0;
+
+    passesPionInRedVolume  = false;
+    passesNoOutgoingPion   = false;
+    passesSmallTracksCut   = false;
+    passesMeanCurvatureCut = false;
+
+    WC2TPCtrkID = -99999;
+
+    wcMatchPDG = -99999;
+    wcMatchProcess = "";
+    wcMatchDaughtersPDG.clear();
+    wcMatchDaughtersProcess.clear();
+    
     isTrackInverted.clear();
     recoBeginX.clear();
     recoBeginY.clear();
@@ -1091,11 +1371,8 @@ void RecoEval::resetTree() {
     matchedEndingPy.clear();
     matchedEndingPz.clear();
     
-    recoPitch.clear();
     recoDEDX.clear();
-    recoEDep.clear();
     recoResR.clear();
-    recoZPos.clear();
     recoMeanDEDX.clear();
 }
 
@@ -1113,8 +1390,17 @@ void RecoEval::reconfigure(fhicl::ParameterSet const & p) {
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
     MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
     TrackStitchingThreshold            = p.get<double> ("TrackStitchingThreshold",4);
-    PROTON_ENERGY_LOWER_BOUND          = p.get<float>("ProtonEnergyLowerBound", 0.075);
-    PROTON_ENERGY_UPPER_BOUND          = p.get<float>("ProtonEnergyUpperBound", 1.0);
+    fMeanDEDXThreshold        = p.get<double>("MeanDEDXThreshold", 5.0);
+    fVertexRadius             = p.get<double>("VertexRadius", 4);
+    SmallTrackLength          = p.get<double>("SmallTrackLength", 35);
+    MaxSmallTracks            = p.get<int>("MaxSmallTracks", 5);
+    MeanCurvatureThreshold    = p.get<double>("MeanCurvatureThreshold", 0.015);
+    PROTON_ENERGY_LOWER_BOUND = p.get<float>("ProtonEnergyLowerBound", 0.075);
+    PROTON_ENERGY_UPPER_BOUND = p.get<float>("ProtonEnergyUpperBound", 1.0);
+    PION_CHI2_PION_VALUE     = p.get<double>("PionChi2PionValue", 3.);
+    PION_CHI2_PROTON_VALUE   = p.get<double>("PionChi2ProtonValue", 1.);
+    PROTON_CHI2_PION_VALUE   = p.get<double>("ProtonChi2PionValue", 3.);
+    PROTON_CHI2_PROTON_VALUE = p.get<double>("ProtonChi2ProtonValue", 5.);
 }
 
 DEFINE_ART_MODULE(RecoEval)
