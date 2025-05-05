@@ -343,6 +343,8 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double> recoEndZ;
         std::vector<int>    recoTrkID;
         std::vector<bool>   isTrackNearVertex;
+        std::vector<double> recoPionChi2;
+        std::vector<double> recoProtonChi2;
 
         int numTaggedAsPions;
         int numTaggedAsProton;
@@ -668,15 +670,15 @@ void RecoEval::analyze(art::Event const &e) {
         double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed, thisTrackDEDX, thisTrackResR);
         recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoMeanDEDX.push_back(thisMeanDEDX);
 
+        // Get chi^2 values
+        int    caloPoints = thisTrackDEDX.size(); 
+        double protonChi2 = computeReducedChi2(gProton, thisTrackResR, thisTrackDEDX, caloPoints);
+        double pionChi2   = computeReducedChi2(gPion, thisTrackResR, thisTrackDEDX, caloPoints);
+
         // Find tracks near vertex
         bool thisTrackNearVertex = false;
         if ((startDistance < fVertexRadius) || (endDistance < fVertexRadius)) {
             thisTrackNearVertex = true;
-
-            // Get chi^2 values
-            int    caloPoints = thisTrackDEDX.size(); 
-            double protonChi2 = computeReducedChi2(gProton, thisTrackResR, thisTrackDEDX, caloPoints);
-            double pionChi2   = computeReducedChi2(gPion, thisTrackResR, thisTrackDEDX, caloPoints);
 
             // Classify track as either pion or proton with chi^2
             if ((pionChi2 < PION_CHI2_PION_VALUE) && (protonChi2 > PROTON_CHI2_PION_VALUE)) {
@@ -719,6 +721,8 @@ void RecoEval::analyze(art::Event const &e) {
         recoEndY.push_back(recoEnd.Y());
         recoEndZ.push_back(recoEnd.Z());
         recoTrkID.push_back(thisTrack->ID());
+        recoPionChi2.push_back(pionChi2);
+        recoProtonChi2.push_back(protonChi2);
 
         // If reco track is not matched to anything, add dummy values
         if (btdata_vector.size() == 0) {
@@ -872,6 +876,8 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("recoEndY", "std::vector<double>", &recoEndY);
     RecoEvalTree->Branch("recoEndZ", "std::vector<double>", &recoEndZ);
     RecoEvalTree->Branch("recoTrkID", "std::vector<int>", &recoTrkID);
+    RecoEvalTree->Branch("recoPionChi2", "std::vector<double>", &recoPionChi2);
+    RecoEvalTree->Branch("recoProtonChi2", "std::vector<double>", &recoProtonChi2);
 
     RecoEvalTree->Branch("matchedIdentity", "std::vector<int>", &matchedIdentity);
     RecoEvalTree->Branch("matchedCleanliness", "std::vector<double>", &matchedCleanliness);

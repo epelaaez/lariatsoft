@@ -838,10 +838,10 @@ void PionAbsorptionSelection::reconfigure(fhicl::ParameterSet const &p) {
     MeanCurvatureThreshold    = p.get<double>("MeanCurvatureThreshold", 0.015);
     PROTON_ENERGY_LOWER_BOUND = p.get<float>("ProtonEnergyLowerBound", 0.075);
     PROTON_ENERGY_UPPER_BOUND = p.get<float>("ProtonEnergyUpperBound", 1.0);
-    PION_CHI2_PION_VALUE      = p.get<double>("PionChi2PionValue", 3.);
-    PION_CHI2_PROTON_VALUE    = p.get<double>("PionChi2ProtonValue", 1.);
-    PROTON_CHI2_PION_VALUE    = p.get<double>("ProtonChi2PionValue", 3.);
-    PROTON_CHI2_PROTON_VALUE  = p.get<double>("ProtonChi2ProtonValue", 4.);
+    PION_CHI2_PION_VALUE      = p.get<double>("PionChi2PionValue", 1.25);
+    PION_CHI2_PROTON_VALUE    = p.get<double>("PionChi2ProtonValue", 2.25);
+    PROTON_CHI2_PION_VALUE    = p.get<double>("ProtonChi2PionValue", 1.75);
+    PROTON_CHI2_PROTON_VALUE  = p.get<double>("ProtonChi2ProtonValue", 2.75);
 }
 
 void PionAbsorptionSelection::beginJob() {
