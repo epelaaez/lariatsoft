@@ -463,7 +463,7 @@ void RecoEval::analyze(art::Event const &e) {
     }
 
     fillSignalInformation(
-        truthPrimaryPDG, 
+        truthPrimaryPDG,
         truthPrimaryVertexX,
         truthPrimaryVertexY,
         truthPrimaryVertexZ,
@@ -1376,6 +1376,9 @@ void RecoEval::resetTree() {
     recoEndY.clear();
     recoEndZ.clear();
     recoTrkID.clear();
+    isTrackNearVertex.clear();
+    recoPionChi2.clear();
+    recoProtonChi2.clear();
 
     matchedIdentity.clear();
     matchedCleanliness.clear();
@@ -1393,10 +1396,8 @@ void RecoEval::resetTree() {
     matchedRealEndY.clear();
     matchedRealEndZ.clear();
     matchedLength.clear();
-
     matchedKEnergy.clear();
     matchedEndingKEnergy.clear();
-
     matchedInitialPx.clear();
     matchedInitialPy.clear();
     matchedInitialPz.clear();
@@ -1406,10 +1407,18 @@ void RecoEval::resetTree() {
     
     recoDEDX.clear();
     recoResR.clear();
-    recoMeanDEDX.clear();
     recoXPos.clear();
     recoYPos.clear();
     recoZPos.clear();
+    recoMeanDEDX.clear();
+
+    truthPrimaryPDG     = -99999;
+    truthPrimaryVertexX = -99999;
+    truthPrimaryVertexY = -99999;
+    truthPrimaryVertexZ = -99999;
+    truthPrimaryDaughtersPDG.clear();
+    truthPrimaryDaughtersProcess.clear();
+    truthPrimaryDaughtersKE.clear();
 
     isPionAbsorptionSignal = false;
     numVisibleProtons      = 0;
