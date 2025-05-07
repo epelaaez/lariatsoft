@@ -219,12 +219,12 @@ class RecoEval : public art::EDAnalyzer {
         bool isWithinActiveVolume(double x, double y, double z);
         bool isWithinReducedVolume(double x, double y, double z);
         bool isWithinReducedVolume(simb::MCParticle *track);
-        double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed, std::vector<double>& trackDEDX, std::vector<double>& trackResR);
+        double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed, std::vector<double>& trackDEDX, std::vector<double>& trackResR, std::vector<double>& trackXPos, std::vector<double>& trackYPos, std::vector<double>& trackZPos);
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
         double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
         std::tuple<double, double> computeCurvature(recob::Track track);
-        void fillSignalInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
-        void fillBackgroundInformation(int pdg, float vx, float vy, float vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillSignalInformation(int pdg, double vx, double vy, double vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillBackgroundInformation(int pdg, double vx, double vy, double vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
         void initializeProtonPoints(TGraph *gProton);
         void initializePionPoints(TGraph *gPion);
         double computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints);
@@ -295,9 +295,9 @@ class RecoEval : public art::EDAnalyzer {
 
         // Truth primary information
         int                      truthPrimaryPDG;
-        float                    truthPrimaryVertexX;
-        float                    truthPrimaryVertexY;
-        float                    truthPrimaryVertexZ;
+        double                   truthPrimaryVertexX;
+        double                   truthPrimaryVertexY;
+        double                   truthPrimaryVertexZ;
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
@@ -331,6 +331,9 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<std::string> wcMatchDaughtersProcess;
         std::vector<double>      wcMatchResR;
         std::vector<double>      wcMatchDEDX;
+        std::vector<double>      wcMatchXPos;
+        std::vector<double>      wcMatchYPos;
+        std::vector<double>      wcMatchZPos;
 
         // Reco variables
         std::vector<bool>   isTrackInverted;
@@ -379,6 +382,9 @@ class RecoEval : public art::EDAnalyzer {
         // Calorimetry variables for tracks
         std::vector<std::vector<double>> recoDEDX;
         std::vector<std::vector<double>> recoResR;
+        std::vector<std::vector<double>> recoXPos;
+        std::vector<std::vector<double>> recoYPos;
+        std::vector<std::vector<double>> recoZPos;
         std::vector<double>              recoMeanDEDX;
 
         // Masses
@@ -594,9 +600,9 @@ void RecoEval::analyze(art::Event const &e) {
                 WC2TPCPrimaryLength = thisTrack->Length();
 
                 // Get calo data
-                std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR;
-                double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isPrimaryReversed, thisTrackDEDX, thisTrackResR);
-                wcMatchResR = thisTrackResR; wcMatchDEDX = thisTrackDEDX;
+                std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
+                double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isPrimaryReversed, thisTrackDEDX, thisTrackResR, thisTrackXPos, thisTrackYPos, thisTrackZPos);
+                wcMatchResR = thisTrackResR; wcMatchDEDX = thisTrackDEDX; wcMatchXPos = thisTrackXPos; wcMatchYPos = thisTrackYPos; wcMatchZPos = thisTrackZPos;
 
                 // Check primary track is inside reduced volume
                 if (!(isWithinReducedVolume(WC2TPCPrimaryEndX, WC2TPCPrimaryEndY, WC2TPCPrimaryEndZ))) {
@@ -666,9 +672,9 @@ void RecoEval::analyze(art::Event const &e) {
         if (thisTrackLength < SmallTrackLength) numSmallTracks++;
 
         // Calo data
-        std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR;
-        double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed, thisTrackDEDX, thisTrackResR);
-        recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoMeanDEDX.push_back(thisMeanDEDX);
+        std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
+        double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed, thisTrackDEDX, thisTrackResR, thisTrackXPos, thisTrackYPos, thisTrackZPos);
+        recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoMeanDEDX.push_back(thisMeanDEDX); recoXPos.push_back(thisTrackXPos); recoYPos.push_back(thisTrackYPos); recoZPos.push_back(thisTrackZPos);
 
         // Get chi^2 values
         int    caloPoints = thisTrackDEDX.size(); 
@@ -831,9 +837,9 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
 
     RecoEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
-    RecoEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/F");
-    RecoEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/F");
-    RecoEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/F");
+    RecoEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/D");
+    RecoEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/D");
+    RecoEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/D");
     RecoEvalTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
     RecoEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
     RecoEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
@@ -865,6 +871,9 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
     RecoEvalTree->Branch("wcMatchResR", "std::vector<double>", &wcMatchResR);
     RecoEvalTree->Branch("wcMatchDEDX", "std::vector<double>", &wcMatchDEDX);
+    RecoEvalTree->Branch("wcMatchXPos", "std::vector<double>", &wcMatchXPos);
+    RecoEvalTree->Branch("wcMatchYPos", "std::vector<double>", &wcMatchYPos);
+    RecoEvalTree->Branch("wcMatchZPos", "std::vector<double>", &wcMatchZPos);
 
     RecoEvalTree->Branch("isTrackInverted", "std::vector<bool>", &isTrackInverted);
     RecoEvalTree->Branch("isTrackNearVertex", "std::vector<bool>", &isTrackNearVertex);
@@ -908,6 +917,9 @@ void RecoEval::beginJob() {
 
     RecoEvalTree->Branch("recoDEDX","std::vector<std::vector<double>>",&recoDEDX);
     RecoEvalTree->Branch("recoResR","std::vector<std::vector<double>>",&recoResR);
+    RecoEvalTree->Branch("recoXPos","std::vector<std::vector<double>>",&recoXPos);
+    RecoEvalTree->Branch("recoYPos","std::vector<std::vector<double>>",&recoYPos);
+    RecoEvalTree->Branch("recoZPos","std::vector<std::vector<double>>",&recoZPos);
     RecoEvalTree->Branch("recoMeanDEDX","std::vector<double>",&recoMeanDEDX);
 
     RecoEvalTree->Branch("passesPionInRedVolume", &passesPionInRedVolume, "passesPionInRedVolume/O");
@@ -1052,7 +1064,7 @@ bool RecoEval::isWithinReducedVolume(double x, double y, double z) {
 
 void RecoEval::fillSignalInformation(
     int pdg,
-    float vx, float vy, float vz,
+    double vx, double vy, double vz,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
@@ -1099,7 +1111,7 @@ void RecoEval::fillSignalInformation(
 
 void RecoEval::fillBackgroundInformation(
     int pdg,
-    float vx, float vy, float vz,
+    double vx, double vy, double vz,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
@@ -1191,13 +1203,18 @@ double RecoEval::meanDEDX(
     unsigned int trackKey, 
     bool isThisTrackReversed,
     std::vector<double>& trackDEDX,
-    std::vector<double>& trackResR
+    std::vector<double>& trackResR,
+    std::vector<double>& trackXPos, 
+    std::vector<double>& trackYPos, 
+    std::vector<double>& trackZPos
 ) {
     // Temporary storage for this reco track
     std::vector<double> recoPitch_v; 
     std::vector<double> recoDEDX_v;
     std::vector<double> recoEDep_v;
     std::vector<double> recoResR_v;
+    std::vector<double> recoXPos_v;
+    std::vector<double> recoYPos_v;
     std::vector<double> recoZPos_v;
 
     if (fmcal.isValid()) {
@@ -1223,6 +1240,8 @@ double RecoEval::meanDEDX(
                 recoDEDX_v.push_back(calos[j]->dEdx()[k]);
                 recoEDep_v.push_back(calos[j]->dEdx()[k] * calos[j]->TrkPitchVec()[k]);
                 recoResR_v.push_back(calos[j]->ResidualRange()[k]);
+                recoXPos_v.push_back(calos[j]->XYZ()[k].X());
+                recoYPos_v.push_back(calos[j]->XYZ()[k].Y());
                 recoZPos_v.push_back(calos[j]->XYZ()[k].Z());
             } // end loop on calo points
 
@@ -1243,6 +1262,9 @@ double RecoEval::meanDEDX(
 
     trackDEDX = recoDEDX_v;
     trackResR = recoResR_v;
+    trackXPos = recoXPos_v;
+    trackYPos = recoYPos_v;
+    trackZPos = recoZPos_v;
     
     return meanDEDX;
 }
@@ -1340,6 +1362,11 @@ void RecoEval::resetTree() {
     wcMatchProcess = "";
     wcMatchDaughtersPDG.clear();
     wcMatchDaughtersProcess.clear();
+    wcMatchDEDX.clear();
+    wcMatchResR.clear();
+    wcMatchXPos.clear();
+    wcMatchYPos.clear();
+    wcMatchZPos.clear();
     
     isTrackInverted.clear();
     recoBeginX.clear();
@@ -1380,6 +1407,13 @@ void RecoEval::resetTree() {
     recoDEDX.clear();
     recoResR.clear();
     recoMeanDEDX.clear();
+    recoXPos.clear();
+    recoYPos.clear();
+    recoZPos.clear();
+
+    isPionAbsorptionSignal = false;
+    numVisibleProtons      = 0;
+    backgroundType         = -1;
 }
 
 void RecoEval::endJob() {
