@@ -1249,6 +1249,9 @@ double RecoEval::meanDEDX(
             if (isThisTrackReversed) {
                 std::reverse(recoResR_v.begin(), recoResR_v.end());
                 std::reverse(recoDEDX_v.begin(), recoDEDX_v.end());
+                std::reverse(recoXPos_v.begin(), recoXPos_v.end());
+                std::reverse(recoYPos_v.begin(), recoYPos_v.end());
+                std::reverse(recoZPos_v.begin(), recoZPos_v.end());
             }
         } // end loop over planes
     }
