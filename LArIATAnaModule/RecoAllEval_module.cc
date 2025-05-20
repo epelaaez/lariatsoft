@@ -230,13 +230,16 @@ class RecoEval : public art::EDAnalyzer {
         double computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints);
 
     private: 
-        // Produce's names
+        // Product's names
         std::string strWCTrackBuilderLabel;
         std::string strTPCTrackHandleLabel;
         std::string strWC2TPCModuleLabel;
         std::string strCalorimetryModuleLabel;
         std::string simulation_producer_label_;
         std::string recotrackmcparticlematching_label_;
+
+        // Histograms
+        TH1D* hTotalEvents;
 
         // fcl parameters
         bool         bVerbose;
@@ -301,6 +304,11 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
+
+        // If pion inelastic scattered, want more information
+        std::vector<int>         truthSecondaryPionDaughtersPDG;
+        std::vector<std::string> truthSecondaryPionDaughtersProcess;
+        std::vector<double>      truthSecondaryPionDaughtersKE;
 
         // WC variables
         int    WC2TPCtrkID;
@@ -453,14 +461,29 @@ void RecoEval::analyze(art::Event const &e) {
         }
     }
 
+    std::vector<int> secondaryPionDaughtersIDs;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
             truthPrimaryDaughtersProcess.push_back(part->Process());
             truthPrimaryDaughtersPDG.push_back(part->PdgCode());
             truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
+
+            // Save information for secondary pions
+            if (part->PdgCode() == -211) {
+                for (int i = 0; i < part->NumberDaughters(); ++i) secondaryPionDaughtersIDs.push_back(part->Daughter(i));
+            }
         }
     }
+
+    for (size_t p = 0; p < plist.size(); ++p) {
+        auto part = plist.Particle(p);
+        if (std::find(secondaryPionDaughtersIDs.begin(), secondaryPionDaughtersIDs.end(), part->TrackId()) != secondaryPionDaughtersIDs.end()) {
+            truthSecondaryPionDaughtersPDG.push_back(part->PdgCode());
+            truthSecondaryPionDaughtersProcess.push_back(part->Process());
+            truthSecondaryPionDaughtersKE.push_back(part->E() - part->Mass());
+        }
+    }                    
 
     fillSignalInformation(
         truthPrimaryPDG,
@@ -472,6 +495,12 @@ void RecoEval::analyze(art::Event const &e) {
         truthPrimaryDaughtersKE
     );
 
+    if (isPionAbsorptionSignal) {
+        if (numVisibleProtons == 0) backgroundType = 0;
+        if (numVisibleProtons > 0)  backgroundType = 1;
+    }
+    hTotalEvents->Fill(backgroundType);
+
     //////////////////////
     // Wire chamber tracks
     //////////////////////
@@ -480,7 +509,7 @@ void RecoEval::analyze(art::Event const &e) {
 
     art::Handle<std::vector<ldp::WCTrack>> wctrackHandle;
     std::vector<art::Ptr<ldp::WCTrack>>    wctrack;
-    // If there is no wire chamber tracks for right label, return
+    // If there is no wire chamber tracks for label, return
     if (!e.getByLabel(strWCTrackBuilderLabel, wctrackHandle)) return;
     art::fill_ptr_vector(wctrack, wctrackHandle);
 
@@ -509,7 +538,7 @@ void RecoEval::analyze(art::Event const &e) {
 
     art::Handle<std::vector<recob::Track>> tpcTrackHandle;
     std::vector<art::Ptr<recob::Track>> tracklist;
-    // If there are no tpc chamber tracks for the label, return
+    // If there are no tpc chamber tracks for label, return
     if (!e.getByLabel(strTPCTrackHandleLabel, tpcTrackHandle)) return; 
     art::fill_ptr_vector(tracklist, tpcTrackHandle);
 
@@ -826,6 +855,8 @@ void RecoEval::beginJob() {
     initializePionPoints(gPion);
 
     // Make histograms and tree branches
+    hTotalEvents = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
+
     RecoEvalTree = tfs->make<TTree>("RecoEvalTree", "RecoEvalTree");
 
     RecoEvalTree->Branch("run", &run, "run/I");
@@ -843,6 +874,10 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
     RecoEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
     RecoEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
+
+    RecoEvalTree->Branch("truthSecondaryPionDaughtersPDG", "std::vector<int>", &truthSecondaryPionDaughtersPDG); 
+    RecoEvalTree->Branch("truthSecondaryPionDaughtersProcess", "std::vector<std::string>", &truthSecondaryPionDaughtersProcess); 
+    RecoEvalTree->Branch("truthSecondaryPionDaughtersKE", "std::vector<double>", &truthSecondaryPionDaughtersKE); 
 
     RecoEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
     RecoEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
@@ -1422,6 +1457,10 @@ void RecoEval::resetTree() {
     truthPrimaryDaughtersPDG.clear();
     truthPrimaryDaughtersProcess.clear();
     truthPrimaryDaughtersKE.clear();
+    
+    truthSecondaryPionDaughtersPDG.clear();
+    truthSecondaryPionDaughtersProcess.clear();
+    truthSecondaryPionDaughtersKE.clear();
 
     isPionAbsorptionSignal = false;
     numVisibleProtons      = 0;

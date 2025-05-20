@@ -1111,7 +1111,7 @@ void PionAbsorptionSelection::fillBackgroundInformation(
         if (pdg == 13) { backgroundType = 2; }
         else if (pdg == 11) { backgroundType = 3; }
         else { backgroundType = 4; }
-        return; 
+        return;
     } 
 
     int numDaughters = daughtersPDG.size();
