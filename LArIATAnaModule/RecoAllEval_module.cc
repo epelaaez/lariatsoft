@@ -185,6 +185,7 @@
 #include "TF1.h"
 #include "TTree.h"
 #include "TTimeStamp.h"
+#include "TLorentzVector.h"
 
 // Type definitions
 typedef std::map<int, art::Ptr<simb::MCParticle>> ParticleMap;
@@ -306,6 +307,11 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<double>      truthPrimaryDaughtersKE;
 
         // If pion inelastic scattered, want more information
+        double                   truthScatteringAngle;
+        double                   truthScatteredPionLength;
+        double                   truthSecondaryVertexX;
+        double                   truthSecondaryVertexY;
+        double                   truthSecondaryVertexZ;
         std::vector<int>         truthSecondaryPionDaughtersPDG;
         std::vector<std::string> truthSecondaryPionDaughtersProcess;
         std::vector<double>      truthSecondaryPionDaughtersKE;
@@ -449,6 +455,7 @@ void RecoEval::analyze(art::Event const &e) {
 
     // Identify true-level primary particle and get its information
     std::vector<int> primaryDaughtersIDs;
+    TLorentzVector primaryStart, primaryEnd;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
@@ -457,11 +464,13 @@ void RecoEval::analyze(art::Event const &e) {
             truthPrimaryVertexX = part->EndX();
             truthPrimaryVertexY = part->EndY();
             truthPrimaryVertexZ = part->EndZ(); 
+            primaryStart = part->Position(); primaryEnd = part->EndPosition();
             break;
         }
     }
 
     std::vector<int> secondaryPionDaughtersIDs;
+    TLorentzVector scatteredPionStart, scatteredPionEnd;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
@@ -471,10 +480,14 @@ void RecoEval::analyze(art::Event const &e) {
 
             // Save information for secondary pions
             if (part->PdgCode() == -211) {
+                // Get daughters of scattered pion
+                truthScatteredPionLength = trackMagnitude(part);
                 for (int i = 0; i < part->NumberDaughters(); ++i) secondaryPionDaughtersIDs.push_back(part->Daughter(i));
+                scatteredPionStart = part->Position(); scatteredPionEnd = part->EndPosition();
             }
         }
     }
+
 
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
@@ -483,7 +496,14 @@ void RecoEval::analyze(art::Event const &e) {
             truthSecondaryPionDaughtersProcess.push_back(part->Process());
             truthSecondaryPionDaughtersKE.push_back(part->E() - part->Mass());
         }
-    }                    
+    }
+
+    TVector3 incomingPrimary(primaryEnd.X() - primaryStart.X(), primaryEnd.Y() - primaryStart.Y(), primaryEnd.Z() - primaryStart.Z());
+    TVector3 scatteredPion(scatteredPionEnd.X() - scatteredPionStart.X(), scatteredPionEnd.Y() - scatteredPionStart.Y(), scatteredPionEnd.Z() - scatteredPionStart.Z());
+    truthScatteringAngle  = incomingPrimary.Angle(scatteredPion);
+    truthSecondaryVertexX = scatteredPionEnd.X();
+    truthSecondaryVertexY = scatteredPionEnd.Y();
+    truthSecondaryVertexZ = scatteredPionEnd.Z();
 
     fillSignalInformation(
         truthPrimaryPDG,
@@ -875,6 +895,11 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
     RecoEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
 
+    RecoEvalTree->Branch("truthScatteringAngle", &truthScatteringAngle, "truthScatteringAngle/D");
+    RecoEvalTree->Branch("truthScatteredPionLength", &truthScatteredPionLength, "truthScatteredPionLength/D");
+    RecoEvalTree->Branch("truthSecondaryVertexX", &truthSecondaryVertexX, "truthSecondaryVertexX/D");
+    RecoEvalTree->Branch("truthSecondaryVertexY", &truthSecondaryVertexY, "truthSecondaryVertexY/D");
+    RecoEvalTree->Branch("truthSecondaryVertexZ", &truthSecondaryVertexZ, "truthSecondaryVertexZ/D");
     RecoEvalTree->Branch("truthSecondaryPionDaughtersPDG", "std::vector<int>", &truthSecondaryPionDaughtersPDG); 
     RecoEvalTree->Branch("truthSecondaryPionDaughtersProcess", "std::vector<std::string>", &truthSecondaryPionDaughtersProcess); 
     RecoEvalTree->Branch("truthSecondaryPionDaughtersKE", "std::vector<double>", &truthSecondaryPionDaughtersKE); 
@@ -1458,6 +1483,11 @@ void RecoEval::resetTree() {
     truthPrimaryDaughtersProcess.clear();
     truthPrimaryDaughtersKE.clear();
     
+    truthScatteringAngle     = -99999;
+    truthScatteredPionLength = -99999;
+    truthSecondaryVertexX    = -99999;
+    truthSecondaryVertexY    = -99999;
+    truthSecondaryVertexZ    = -99999;
     truthSecondaryPionDaughtersPDG.clear();
     truthSecondaryPionDaughtersProcess.clear();
     truthSecondaryPionDaughtersKE.clear();
