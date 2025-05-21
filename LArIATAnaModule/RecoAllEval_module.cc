@@ -456,6 +456,7 @@ void RecoEval::analyze(art::Event const &e) {
     // Identify true-level primary particle and get its information
     std::vector<int> primaryDaughtersIDs;
     TLorentzVector primaryStart, primaryEnd;
+    TLorentzVector vertexMomentum;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
@@ -465,12 +466,14 @@ void RecoEval::analyze(art::Event const &e) {
             truthPrimaryVertexY = part->EndY();
             truthPrimaryVertexZ = part->EndZ(); 
             primaryStart = part->Position(); primaryEnd = part->EndPosition();
+            vertexMomentum = part->Momentum(part->NumberTrajectoryPoints() - 2);
             break;
         }
     }
 
     std::vector<int> secondaryPionDaughtersIDs;
     TLorentzVector scatteredPionStart, scatteredPionEnd;
+    TLorentzVector outgoingScatterMomentum;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
@@ -484,6 +487,7 @@ void RecoEval::analyze(art::Event const &e) {
                 truthScatteredPionLength = trackMagnitude(part);
                 for (int i = 0; i < part->NumberDaughters(); ++i) secondaryPionDaughtersIDs.push_back(part->Daughter(i));
                 scatteredPionStart = part->Position(); scatteredPionEnd = part->EndPosition();
+                outgoingScatterMomentum = part->Momentum();
             }
         }
     }
@@ -500,7 +504,8 @@ void RecoEval::analyze(art::Event const &e) {
 
     TVector3 incomingPrimary(primaryEnd.X() - primaryStart.X(), primaryEnd.Y() - primaryStart.Y(), primaryEnd.Z() - primaryStart.Z());
     TVector3 scatteredPion(scatteredPionEnd.X() - scatteredPionStart.X(), scatteredPionEnd.Y() - scatteredPionStart.Y(), scatteredPionEnd.Z() - scatteredPionStart.Z());
-    truthScatteringAngle  = incomingPrimary.Angle(scatteredPion);
+    // truthScatteringAngle  = incomingPrimary.Angle(scatteredPion);
+    truthScatteringAngle = vertexMomentum.Angle(outgoingScatterMomentum.Vect());
     truthSecondaryVertexX = scatteredPionEnd.X();
     truthSecondaryVertexY = scatteredPionEnd.Y();
     truthSecondaryVertexZ = scatteredPionEnd.Z();
