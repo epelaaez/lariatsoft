@@ -309,6 +309,7 @@ class RecoEval : public art::EDAnalyzer {
         // If pion inelastic scattered, want more information
         double                   truthScatteringAngle;
         double                   truthScatteredPionLength;
+        double                   truthScatteredPionKE;
         double                   truthSecondaryVertexX;
         double                   truthSecondaryVertexY;
         double                   truthSecondaryVertexZ;
@@ -485,6 +486,7 @@ void RecoEval::analyze(art::Event const &e) {
             if (part->PdgCode() == -211) {
                 // Get daughters of scattered pion
                 truthScatteredPionLength = trackMagnitude(part);
+                truthScatteredPionKE     = part->E() - part->Mass();
                 for (int i = 0; i < part->NumberDaughters(); ++i) secondaryPionDaughtersIDs.push_back(part->Daughter(i));
                 scatteredPionStart = part->Position(); scatteredPionEnd = part->EndPosition();
                 outgoingScatterMomentum = part->Momentum();
@@ -902,6 +904,7 @@ void RecoEval::beginJob() {
 
     RecoEvalTree->Branch("truthScatteringAngle", &truthScatteringAngle, "truthScatteringAngle/D");
     RecoEvalTree->Branch("truthScatteredPionLength", &truthScatteredPionLength, "truthScatteredPionLength/D");
+    RecoEvalTree->Branch("truthScatteredPionKE", &truthScatteredPionKE, "truthScatteredPionKE/D");
     RecoEvalTree->Branch("truthSecondaryVertexX", &truthSecondaryVertexX, "truthSecondaryVertexX/D");
     RecoEvalTree->Branch("truthSecondaryVertexY", &truthSecondaryVertexY, "truthSecondaryVertexY/D");
     RecoEvalTree->Branch("truthSecondaryVertexZ", &truthSecondaryVertexZ, "truthSecondaryVertexZ/D");
@@ -1490,6 +1493,7 @@ void RecoEval::resetTree() {
     
     truthScatteringAngle     = -99999;
     truthScatteredPionLength = -99999;
+    truthScatteredPionKE     = -99999;
     truthSecondaryVertexX    = -99999;
     truthSecondaryVertexY    = -99999;
     truthSecondaryVertexZ    = -99999;
