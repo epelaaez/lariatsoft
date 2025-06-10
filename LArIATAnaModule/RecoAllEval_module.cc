@@ -105,6 +105,7 @@
 #include <TH2F.h>
 #include <TGraph.h>
 #include <TTree.h>
+#include "TRandom2.h"
 
 // ####################
 // ### C++ includes ###
@@ -238,6 +239,20 @@ class RecoEval : public art::EDAnalyzer {
         std::string strCalorimetryModuleLabel;
         std::string simulation_producer_label_;
         std::string recotrackmcparticlematching_label_;
+        std::string fHitsModule;
+        std::string fHitsInstance;
+
+        // Detector properties
+        detinfo::DetectorProperties const* fDetProp;
+        float fEfield;
+        float fDriftVelocity[3]; 
+        float fSamplingRate; 
+        float fXTicksOffset[2]; 
+        float fTriggerOffset;
+        float fElectronLifeTime;
+
+        // Calorimetry algorithm
+        calo::CalorimetryAlg fCaloAlg;
 
         // Histograms
         TH1D* hTotalEvents;
@@ -269,6 +284,7 @@ class RecoEval : public art::EDAnalyzer {
         int run; 
         int subrun;
         int event;
+        bool isData;
 
         // Signal information
         bool isPionAbsorptionSignal;
@@ -402,6 +418,21 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<std::vector<double>> recoZPos;
         std::vector<double>              recoMeanDEDX;
 
+        // Vectors to fill with individual hit information
+        std::vector<art::Ptr<recob::Hit>> fHitlist;
+        std::vector<int>                  fHitKey;
+        std::vector<int>                  fHitPlane;
+        std::vector<float>                fHitT;
+        std::vector<float>                fHitX;
+        std::vector<float>                fHitW;
+        std::vector<float>                fHitCharge;
+        std::vector<float>                fHitChargeCol;
+        std::vector<int>                  hitRecoAsTrackKey;
+        std::vector<int>                  hitWC2TPCKey;
+        float                             primaryEndPointHitX;
+        float                             primaryEndPointHitW;
+        std::vector<int>                  candidateInductionHits;
+
         // Masses
         const double PionMass    = .13957018;    // in GeV
         const double ProtonMass  = .93827208816; // in GeV
@@ -422,18 +453,42 @@ class RecoEval : public art::EDAnalyzer {
         const double RmaxY = 15.0;
         const double RminZ =  8.0;
         const double RmaxZ = 82.0;
+
+        // Random generator
+        TRandom2* fRand;
+        int       fRandSeed = 1989;
 };
 
-RecoEval::RecoEval(fhicl::ParameterSet const &p) : EDAnalyzer(p) {
+RecoEval::RecoEval(fhicl::ParameterSet const &p) 
+    : EDAnalyzer(p)
+     ,fCaloAlg(p.get<fhicl::ParameterSet>("CaloAlg"))
+{
     this->reconfigure(p);
+
+    // Initialize detprop pointer
+    fDetProp = lar::providerFrom<detinfo::DetectorPropertiesService>();
 }
 
 void RecoEval::analyze(art::Event const &e) {
     resetTree();
 
-    run = e.run(); subrun = e.subRun(); event = e.event();
-    if (bVerbose) std::cout << "Run: " << run << ", subrun: " << subrun << ", event: " << event << std::endl;
+    run = e.run(); subrun = e.subRun(); event = e.event(); isData = e.isRealData();
+    if (bVerbose) std::cout << "Run: " << run << ", subrun: " << subrun << ", event: " << event << ", is real data: " << isData << std::endl;
     if (bVerbose) std::cout << std::endl;
+
+    // Get detector properties
+    fEfield           = fDetProp->Efield(0);
+    fDriftVelocity[0] = fDetProp->DriftVelocity(fEfield, fDetProp->Temperature());
+    fDriftVelocity[1] = fDetProp->DriftVelocity(fDetProp->Efield(1), fDetProp->Temperature());
+    fDriftVelocity[2] = fDetProp->DriftVelocity(fDetProp->Efield(2), fDetProp->Temperature());
+    fTriggerOffset    = fDetProp->TriggerOffset();
+    fElectronLifeTime = fDetProp->ElectronLifetime();
+    fXTicksOffset[0]  = fDetProp->GetXTicksOffset(0,0,0);
+    fXTicksOffset[1]  = fDetProp->GetXTicksOffset(1,0,0);
+    fSamplingRate     = fDetProp->SamplingRate() * 1e-3;
+
+    // Random number generator
+    fRand = new TRandom2(fRandSeed);
 
     //////////////
     // Get MC data
@@ -582,15 +637,12 @@ void RecoEval::analyze(art::Event const &e) {
     art::FindOneP<recob::Track> fWC2TPC(wctrackHandle, e, strWC2TPCModuleLabel);
 
     if (fWC2TPC.isValid()) {
-        if (bVerbose) std::cout << "Wire chamber to TPC is valid" << std::endl;
+        if (bVerbose) std::cout << "Wire chamber to TPC is valid with size: " << fWC2TPC.size() << std::endl;
         for (unsigned int i = 0; i < fWC2TPC.size(); ++i) {
             cet::maybe_ref<recob::Track const> trackWC2TPC(*fWC2TPC.at(i));
             if (!trackWC2TPC) continue;
             recob::Track const& aTrack(trackWC2TPC.ref());
             WC2TPCtrkID = aTrack.ID();
-
-            if (bVerbose) std::cout << "Wire chamber to TPC track id: " << WC2TPCtrkID << std::endl;
-            if (bVerbose) std::cout << std::endl;
 
             auto recoWC2TPCBeginning = aTrack.Start();
             if ((aTrack.Start()).Z() < (aTrack.End()).Z()) {
@@ -602,7 +654,11 @@ void RecoEval::analyze(art::Event const &e) {
             WC2TPCPrimaryBeginY = recoWC2TPCBeginning.Y();
             WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();
         } // end trackWC2TPC loop
-    } // end if fWC2TPC.isValid()
+    } else {
+        if (bVerbose) std::cout << "Wire chamber to TPC is NOT valid!" << std::endl;
+    }
+    if (bVerbose) std::cout << "Wire chamber to TPC track ID: " << WC2TPCtrkID << std::endl;
+    if (bVerbose) std::cout << std::endl;
 
     /////////////////////
     // MC particle tracks
@@ -620,7 +676,6 @@ void RecoEval::analyze(art::Event const &e) {
     const art::FindManyP<simb::MCParticle, anab::BackTrackerMatchingData>
         find_many_mcparticles_from_tracks(tpcTrackHandle, e, recotrackmcparticlematching_label_);
 
-    
     // Check that there is a WC to TPC match, and check if pion stops inside fiducial volume
     if (WC2TPCtrkID != -99999) {
         // Found match, now find track
@@ -870,6 +925,122 @@ void RecoEval::analyze(art::Event const &e) {
     }
 
     if (bVerbose) std::cout << std::endl;
+
+    //////////////////
+    // Clustering hits
+    //////////////////
+
+    // Hits for clustering
+    art::Handle< std::vector<recob::Hit> > hitListHandle;
+    if (e.getByLabel(fHitsModule, fHitsInstance, hitListHandle)) { art::fill_ptr_vector(fHitlist, hitListHandle); }
+    size_t nWireHits = fHitlist.size();
+
+    // Reserve space for hit information
+    fHitKey.reserve(nWireHits);
+    fHitPlane.reserve(nWireHits);
+    fHitT.reserve(nWireHits);
+    fHitX.reserve(nWireHits);
+    fHitW.reserve(nWireHits);
+    fHitCharge.reserve(nWireHits);
+    fHitChargeCol.reserve(nWireHits);
+
+    // First, we get all the information about hour hits
+    for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
+        int   hitPlane = fHitlist[iHit]->WireID().Plane;
+        float hitTime0 = fSamplingRate * (fHitlist[iHit]->PeakTime() - fTriggerOffset);
+        float hitTime  = fSamplingRate * (fHitlist[iHit]->PeakTime() - fXTicksOffset[hitPlane]);
+        float ltCorFac = 1.;
+        if (hitTime0 >= 0) { ltCorFac = exp(hitTime0 / fElectronLifeTime); }
+
+        fHitKey.push_back(iHit);
+        fHitPlane.push_back(hitPlane); // collection == 1, induction == 0
+        fHitT.push_back(hitTime); // us
+        fHitX.push_back(hitTime * fDriftVelocity[0]);
+        if (fHitlist[iHit]->Channel() < 240) {
+            fHitW.push_back(fHitlist[iHit]->Channel() * 0.4);
+        } else {
+            fHitW.push_back((fHitlist[iHit]->Channel() - 240) * 0.4);
+        }
+        fHitChargeCol.push_back(fCaloAlg.ElectronsFromADCArea(fHitlist[iHit]->Integral(), hitPlane));
+        fHitCharge.push_back(fHitChargeCol.at(iHit) * ltCorFac);
+
+        // Add stochasticity for MC data
+        if (!isData) {
+            float prob  = 1. / exp(hitTime0 / fElectronLifeTime);
+            float mean  = fHitCharge.at(iHit) * prob;
+            float sigma = sqrt(mean*(1. - prob));
+            float fac   = (fRand->Gaus(mean, sigma) * ltCorFac) / fHitCharge.at(iHit);
+            fHitCharge.at(iHit)   *= fac;
+        }
+    }
+
+    if (bVerbose) std::cout << "Hits found for this event: " << fHitKey.size() << std::endl;
+
+    // Associations between tracks and hits
+    art::FindManyP<recob::Hit, recob::TrackHitMeta> fmthm(tpcTrackHandle, e, strTPCTrackHandleLabel);
+    
+    // We now want to loop through tracks and find what hits are already associated to tracks
+    int totalNHits = 0;
+    for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
+        auto thisTrack = tracklist.at(trk_idx);
+        int  nHits     = 0;
+        if (bVerbose) std::cout << "  Track id: " << thisTrack->ID() << std::endl;
+
+        if (fmthm.isValid()) {
+            auto vhit = fmthm.at(thisTrack->ID());
+            for (size_t h = 0; h < vhit.size(); ++h) {
+                if (thisTrack->ID() == WC2TPCtrkID) hitWC2TPCKey.push_back(vhit[h].key());
+                hitRecoAsTrackKey.push_back(vhit[h].key());
+                ++nHits;
+            }
+        }
+        totalNHits += nHits;
+        if (bVerbose) std::cout << "    Hits for this track: " << nHits << std::endl;
+    }
+    if (bVerbose) std:: cout << "Total hits for all tracks: " << totalNHits << std::endl;
+
+    // First, we find the end hit for the main TPC track
+    float maxHitTime = -1e9;
+    int   endpointHitIdx = -1;
+    for (size_t i = 0; i < hitWC2TPCKey.size(); ++i) {
+        int hitIdx = hitWC2TPCKey[i];
+        if (fHitPlane[hitIdx] != 0) continue; // induction plane only
+
+        float hitTime = fHitT[hitIdx];
+        if (hitTime > maxHitTime) {
+            maxHitTime = hitTime;
+            endpointHitIdx = hitIdx;
+        }
+    }
+
+    // Use the hit position in X-W of this endpoint
+    primaryEndPointHitX = fHitX[endpointHitIdx];
+    primaryEndPointHitW = fHitW[endpointHitIdx];
+
+    if (bVerbose) std::cout << "End hit X: " << primaryEndPointHitX << " W: " << primaryEndPointHitW << std::endl;
+    if (bVerbose) std::cout << std::endl;
+
+    // We now want to find hits near the endpoint that do not match to any tracks already
+    const float xThreshold = 5.0;
+    std::unordered_set<int> hitsInTracks(hitRecoAsTrackKey.begin(), hitRecoAsTrackKey.end()); // easily check if hit is here
+
+    if (bVerbose) std::cout << "Looking at hits not reconstructed as tracks: " << std::endl;
+    for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
+        // Skip hits already in tracks and collection plane
+        if (hitsInTracks.count(iHit) > 0) continue;
+        if (fHitPlane[iHit] != 0) continue;
+
+        float hitX = fHitX[iHit];
+        float hitW = fHitW[iHit];
+
+        float dX = std::abs(hitX - primaryEndPointHitX);
+        if (bVerbose) std::cout << "  dX: " << dX << std::endl;
+        if (dX < xThreshold) candidateInductionHits.push_back(iHit);
+    }
+
+    if (bVerbose) std::cout << "Candidate hits near the WC2TPC endpoint in the induction plane: " << candidateInductionHits.size() << std::endl;
+    if (bVerbose) std::cout << std::endl;
+
     RecoEvalTree->Fill();
 }
 
@@ -998,6 +1169,21 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("numTaggedAsPions", &numTaggedAsPions, "numTaggedAsPions/I");
     RecoEvalTree->Branch("numTaggedAsProton", &numTaggedAsProton, "numTaggedAsProton/I");
     RecoEvalTree->Branch("numNotTagged", &numNotTagged, "numTaggenumNotTaggeddAsPions/I");
+
+    RecoEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
+    RecoEvalTree->Branch("fHitKey", "std::vector<int>", &fHitKey);
+    RecoEvalTree->Branch("fHitPlane", "std::vector<int>", &fHitPlane);
+    RecoEvalTree->Branch("fHitT", "std::vector<float>", &fHitT);
+    RecoEvalTree->Branch("fHitX", "std::vector<float>", &fHitX);
+    RecoEvalTree->Branch("fHitW", "std::vector<float>", &fHitW);
+    RecoEvalTree->Branch("fHitCharge", "std::vector<float>", &fHitCharge);
+    RecoEvalTree->Branch("fHitChargeCol", "std::vector<float>", &fHitChargeCol);
+
+    RecoEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
+    RecoEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
+    RecoEvalTree->Branch("candidateInductionHits", "std::vector<int>", &candidateInductionHits);
+    RecoEvalTree->Branch("primaryEndPointHitX", &primaryEndPointHitX, "primaryEndPointHitX/D");
+    RecoEvalTree->Branch("primaryEndPointHitW", &primaryEndPointHitW, "primaryEndPointHitW/D");
 }
 
 unsigned int RecoEval::lastPointInTPC(simb::MCParticle *track)
@@ -1504,6 +1690,21 @@ void RecoEval::resetTree() {
     isPionAbsorptionSignal = false;
     numVisibleProtons      = 0;
     backgroundType         = -1;
+
+    fHitlist.clear();
+    fHitKey.clear();
+    fHitPlane.clear();
+    fHitT.clear();
+    fHitX.clear();
+    fHitW.clear();
+    fHitCharge.clear();
+    fHitChargeCol.clear();
+
+    hitRecoAsTrackKey.clear();
+    hitWC2TPCKey.clear();
+    candidateInductionHits.clear();
+    primaryEndPointHitX = 0.;
+    primaryEndPointHitW = 0.;
 }
 
 void RecoEval::endJob() {
@@ -1518,6 +1719,8 @@ void RecoEval::reconfigure(fhicl::ParameterSet const & p) {
     strCalorimetryModuleLabel          = p.get<std::string>("CalorimetryModuleLabel", "calo");
     simulation_producer_label_         = p.get<std::string>("SimulationLabel", "largeant");
     recotrackmcparticlematching_label_ = p.get<std::string>("RecoTrackMCMatchLabel", "recotrackmcmatching");
+    fHitsModule                        = p.get< std::string>("HitsModule", "gaushit");
+    fHitsInstance                      = p.get< std::string>("HitsInstance", "");
     MeanDEDXNumberTrajPoints           = p.get<unsigned int>("MeanDEDXNumberTrajPoints", 20);
     TrackStitchingThreshold            = p.get<double> ("TrackStitchingThreshold",4);
     fMeanDEDXThreshold        = p.get<double>("MeanDEDXThreshold", 5.0);

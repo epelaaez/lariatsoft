@@ -1,3 +1,4 @@
+#include "calorimetry.fcl"
 #include "services_lariat.fcl"
 #include "recomcparticlematching.fcl"
 
@@ -39,6 +40,9 @@ physics: {
             MeanDEDXNumberTrajPoints: 20
             ProtonEnergyLowerBound:   0.075
             ProtonEnergyUpperBound:   1.0
+            HitsModule:               "gaushit"
+            HitsInstance:             ""
+            CaloAlg:                  @local::standard_calorimetryalgmc
         }
     }
 
