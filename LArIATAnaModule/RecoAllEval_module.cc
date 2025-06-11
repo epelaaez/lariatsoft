@@ -429,9 +429,8 @@ class RecoEval : public art::EDAnalyzer {
         std::vector<float>                fHitChargeCol;
         std::vector<int>                  hitRecoAsTrackKey;
         std::vector<int>                  hitWC2TPCKey;
-        float                             primaryEndPointHitX;
-        float                             primaryEndPointHitW;
-        std::vector<int>                  candidateInductionHits;
+        double                            primaryEndPointHitX;
+        double                            primaryEndPointHitW;
 
         // Masses
         const double PionMass    = .13957018;    // in GeV
@@ -1020,27 +1019,6 @@ void RecoEval::analyze(art::Event const &e) {
     if (bVerbose) std::cout << "End hit X: " << primaryEndPointHitX << " W: " << primaryEndPointHitW << std::endl;
     if (bVerbose) std::cout << std::endl;
 
-    // We now want to find hits near the endpoint that do not match to any tracks already
-    const float xThreshold = 5.0;
-    std::unordered_set<int> hitsInTracks(hitRecoAsTrackKey.begin(), hitRecoAsTrackKey.end()); // easily check if hit is here
-
-    if (bVerbose) std::cout << "Looking at hits not reconstructed as tracks: " << std::endl;
-    for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
-        // Skip hits already in tracks and collection plane
-        if (hitsInTracks.count(iHit) > 0) continue;
-        if (fHitPlane[iHit] != 0) continue;
-
-        float hitX = fHitX[iHit];
-        float hitW = fHitW[iHit];
-
-        float dX = std::abs(hitX - primaryEndPointHitX);
-        if (bVerbose) std::cout << "  dX: " << dX << std::endl;
-        if (dX < xThreshold) candidateInductionHits.push_back(iHit);
-    }
-
-    if (bVerbose) std::cout << "Candidate hits near the WC2TPC endpoint in the induction plane: " << candidateInductionHits.size() << std::endl;
-    if (bVerbose) std::cout << std::endl;
-
     RecoEvalTree->Fill();
 }
 
@@ -1181,7 +1159,6 @@ void RecoEval::beginJob() {
 
     RecoEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
     RecoEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
-    RecoEvalTree->Branch("candidateInductionHits", "std::vector<int>", &candidateInductionHits);
     RecoEvalTree->Branch("primaryEndPointHitX", &primaryEndPointHitX, "primaryEndPointHitX/D");
     RecoEvalTree->Branch("primaryEndPointHitW", &primaryEndPointHitW, "primaryEndPointHitW/D");
 }
@@ -1702,7 +1679,6 @@ void RecoEval::resetTree() {
 
     hitRecoAsTrackKey.clear();
     hitWC2TPCKey.clear();
-    candidateInductionHits.clear();
     primaryEndPointHitX = 0.;
     primaryEndPointHitW = 0.;
 }
