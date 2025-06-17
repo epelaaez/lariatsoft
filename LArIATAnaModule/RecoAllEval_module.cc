@@ -318,6 +318,8 @@ class RecoEval : public art::EDAnalyzer {
         double                   truthPrimaryVertexX;
         double                   truthPrimaryVertexY;
         double                   truthPrimaryVertexZ;
+        double                   truthPrimaryIncidentKE;
+        double                   truthPrimaryVertexKE;
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
@@ -355,7 +357,11 @@ class RecoEval : public art::EDAnalyzer {
         double WCMeanCurvature;
         double WCMaxCurvature;
 
-        // Wire chamber match truth information
+        std::vector<double> WC2TPCLocationsX;
+        std::vector<double> WC2TPCLocationsY;
+        std::vector<double> WC2TPCLocationsZ;
+
+        // WC2TPC truth information
         int                      wcMatchPDG;
         std::string              wcMatchProcess = "";
         std::vector<int>         wcMatchDaughtersPDG;
@@ -517,11 +523,13 @@ void RecoEval::analyze(art::Event const &e) {
         if (part->Process() == "primary") {
             truthPrimaryPDG = part->PdgCode();
             for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
-            truthPrimaryVertexX = part->EndX();
-            truthPrimaryVertexY = part->EndY();
-            truthPrimaryVertexZ = part->EndZ(); 
-            primaryStart = part->Position(); primaryEnd = part->EndPosition();
-            vertexMomentum = part->Momentum(part->NumberTrajectoryPoints() - 2);
+            truthPrimaryVertexX    = part->EndX();
+            truthPrimaryVertexY    = part->EndY();
+            truthPrimaryVertexZ    = part->EndZ(); 
+            primaryStart           = part->Position(); primaryEnd = part->EndPosition();
+            vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
+            truthPrimaryIncidentKE = part->E() - part->Mass();
+            truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - part->Mass();
             break;
         }
     }
@@ -684,6 +692,15 @@ void RecoEval::analyze(art::Event const &e) {
             recob::TrackTrajectory::Point_t recoWC2TPCEnd;
 
             if (thisTrack->ID() == WC2TPCtrkID) {
+                // Get primary track coordinates
+                int numCoordPoints = thisTrack->NPoints();
+                if (bVerbose) std::cout << "Primary track num coords: " << numCoordPoints << std::endl;
+                for (int iCoord = 0; iCoord < numCoordPoints; ++iCoord) {
+                    TVector3 p = thisTrack->LocationAtPoint<TVector3>(iCoord);
+                    WC2TPCLocationsX.push_back(p.X()); WC2TPCLocationsY.push_back(p.Y()); WC2TPCLocationsZ.push_back(p.Z());
+                    if (bVerbose) std::cout << "  x: " << p.X() << " y: " << p.Y() << " z: " << p.Z() << std::endl;
+                }
+
                 // Get curvature
                 auto [meanCurvature, maxCurvature] = computeCurvature(*thisTrack);
                 WCMeanCurvature = meanCurvature;
@@ -1044,6 +1061,8 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
 
     RecoEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
+    RecoEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
+    RecoEvalTree->Branch("truthPrimaryVertexKE", &truthPrimaryVertexKE, "truthPrimaryVertexKE/D");
     RecoEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/D");
     RecoEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/D");
     RecoEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/D");
@@ -1091,6 +1110,10 @@ void RecoEval::beginJob() {
     RecoEvalTree->Branch("wcMatchXPos", "std::vector<double>", &wcMatchXPos);
     RecoEvalTree->Branch("wcMatchYPos", "std::vector<double>", &wcMatchYPos);
     RecoEvalTree->Branch("wcMatchZPos", "std::vector<double>", &wcMatchZPos);
+
+    RecoEvalTree->Branch("WC2TPCLocationsX", "std::vector<double>", &WC2TPCLocationsX);
+    RecoEvalTree->Branch("WC2TPCLocationsY", "std::vector<double>", &WC2TPCLocationsY);
+    RecoEvalTree->Branch("WC2TPCLocationsZ", "std::vector<double>", &WC2TPCLocationsZ);
 
     RecoEvalTree->Branch("isTrackInverted", "std::vector<bool>", &isTrackInverted);
     RecoEvalTree->Branch("isTrackNearVertex", "std::vector<bool>", &isTrackNearVertex);
@@ -1601,6 +1624,10 @@ void RecoEval::resetTree() {
     wcMatchXPos.clear();
     wcMatchYPos.clear();
     wcMatchZPos.clear();
+
+    WC2TPCLocationsX.clear();
+    WC2TPCLocationsY.clear();
+    WC2TPCLocationsZ.clear();
     
     isTrackInverted.clear();
     recoBeginX.clear();
@@ -1646,10 +1673,12 @@ void RecoEval::resetTree() {
     recoZPos.clear();
     recoMeanDEDX.clear();
 
-    truthPrimaryPDG     = -99999;
-    truthPrimaryVertexX = -99999;
-    truthPrimaryVertexY = -99999;
-    truthPrimaryVertexZ = -99999;
+    truthPrimaryPDG        = -99999;
+    truthPrimaryIncidentKE = -99999;
+    truthPrimaryVertexKE   = -99999;
+    truthPrimaryVertexX    = -99999;
+    truthPrimaryVertexY    = -99999;
+    truthPrimaryVertexZ    = -99999;
     truthPrimaryDaughtersPDG.clear();
     truthPrimaryDaughtersProcess.clear();
     truthPrimaryDaughtersKE.clear();
