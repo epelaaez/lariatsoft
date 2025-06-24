@@ -1,10 +1,10 @@
 //////////////////////////////////////////////////////////////////////////
-// Class:       RecoEval
+// Class:       RecoAllEval
 // Module Type: analyzer
-// File:        RecoEval_module.cc
+// File:        RecoAllEval_module.cc
 //
 // Written by Emilio Peláez, created on January 2025. Adapted from XSAnalysis module
-// and RecoEval module by Matt King.
+// and RecoAllEval module by Matt King.
 ////////////////////////////////////////////////////////////////////////
 
 // ########################
@@ -191,13 +191,13 @@
 // Type definitions
 typedef std::map<int, art::Ptr<simb::MCParticle>> ParticleMap;
 
-class RecoEval : public art::EDAnalyzer {
+class RecoAllEval : public art::EDAnalyzer {
     public: 
-        explicit RecoEval(fhicl::ParameterSet const &p);
-        RecoEval(RecoEval const &) = delete;
-        RecoEval(RecoEval &&) = delete;
-        RecoEval & operator = (RecoEval const &) = delete;
-        RecoEval & operator = (RecoEval &&) = delete;
+        explicit RecoAllEval(fhicl::ParameterSet const &p);
+        RecoAllEval(RecoAllEval const &) = delete;
+        RecoAllEval(RecoAllEval &&) = delete;
+        RecoAllEval & operator = (RecoAllEval const &) = delete;
+        RecoAllEval & operator = (RecoAllEval &&) = delete;
 
         // Required functions
         void analyze(art::Event const &e) override;
@@ -278,7 +278,7 @@ class RecoEval : public art::EDAnalyzer {
         TGraph* gPion   = new TGraph();
 
         // Output tree
-        TTree *RecoEvalTree;
+        TTree *RecoAllEvalTree;
 
         // Event metadata
         int run; 
@@ -451,7 +451,7 @@ class RecoEval : public art::EDAnalyzer {
         const double minZ =  3.0;
         const double maxZ = 87.0;
         
-        // Fiducial volume for interactions
+        // Reduced volume for interactions
         const double RminX =  5.0;
         const double RmaxX = 42.0;
         const double RminY =-15.0; 
@@ -464,7 +464,7 @@ class RecoEval : public art::EDAnalyzer {
         int       fRandSeed = 1989;
 };
 
-RecoEval::RecoEval(fhicl::ParameterSet const &p) 
+RecoAllEval::RecoAllEval(fhicl::ParameterSet const &p) 
     : EDAnalyzer(p)
      ,fCaloAlg(p.get<fhicl::ParameterSet>("CaloAlg"))
 {
@@ -474,7 +474,7 @@ RecoEval::RecoEval(fhicl::ParameterSet const &p)
     fDetProp = lar::providerFrom<detinfo::DetectorPropertiesService>();
 }
 
-void RecoEval::analyze(art::Event const &e) {
+void RecoAllEval::analyze(art::Event const &e) {
     resetTree();
 
     run = e.run(); subrun = e.subRun(); event = e.event(); isData = e.isRealData();
@@ -495,9 +495,9 @@ void RecoEval::analyze(art::Event const &e) {
     // Random number generator
     fRand = new TRandom2(fRandSeed);
 
-    //////////////
-    // Get MC data
-    //////////////
+    /////////////////
+    // Get MC data //
+    /////////////////
 
     // Get simulated particles
     auto particle_handle = e.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
@@ -555,7 +555,6 @@ void RecoEval::analyze(art::Event const &e) {
             }
         }
     }
-
 
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
@@ -1036,10 +1035,10 @@ void RecoEval::analyze(art::Event const &e) {
     if (bVerbose) std::cout << "End hit X: " << primaryEndPointHitX << " W: " << primaryEndPointHitW << std::endl;
     if (bVerbose) std::cout << std::endl;
 
-    RecoEvalTree->Fill();
+    RecoAllEvalTree->Fill();
 }
 
-void RecoEval::beginJob() {
+void RecoAllEval::beginJob() {
     if (bVerbose) std::cout << "Beginning job." << std::endl;
     art::ServiceHandle<art::TFileService> tfs;
 
@@ -1050,144 +1049,143 @@ void RecoEval::beginJob() {
     // Make histograms and tree branches
     hTotalEvents = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
 
-    RecoEvalTree = tfs->make<TTree>("RecoEvalTree", "RecoEvalTree");
+    RecoAllEvalTree = tfs->make<TTree>("RecoAllEvalTree", "RecoAllEvalTree");
 
-    RecoEvalTree->Branch("run", &run, "run/I");
-    RecoEvalTree->Branch("subrun", &subrun, "subrun/I");
-    RecoEvalTree->Branch("event", &event, "event/I");
+    RecoAllEvalTree->Branch("run", &run, "run/I");
+    RecoAllEvalTree->Branch("subrun", &subrun, "subrun/I");
+    RecoAllEvalTree->Branch("event", &event, "event/I");
 
-    RecoEvalTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
-    RecoEvalTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
-    RecoEvalTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
+    RecoAllEvalTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
+    RecoAllEvalTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
+    RecoAllEvalTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
 
-    RecoEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
-    RecoEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
-    RecoEvalTree->Branch("truthPrimaryVertexKE", &truthPrimaryVertexKE, "truthPrimaryVertexKE/D");
-    RecoEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/D");
-    RecoEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/D");
-    RecoEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/D");
-    RecoEvalTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
-    RecoEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
-    RecoEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
+    RecoAllEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
+    RecoAllEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
+    RecoAllEvalTree->Branch("truthPrimaryVertexKE", &truthPrimaryVertexKE, "truthPrimaryVertexKE/D");
+    RecoAllEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/D");
+    RecoAllEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/D");
+    RecoAllEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/D");
+    RecoAllEvalTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
+    RecoAllEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
+    RecoAllEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
 
-    RecoEvalTree->Branch("truthScatteringAngle", &truthScatteringAngle, "truthScatteringAngle/D");
-    RecoEvalTree->Branch("truthScatteredPionLength", &truthScatteredPionLength, "truthScatteredPionLength/D");
-    RecoEvalTree->Branch("truthScatteredPionKE", &truthScatteredPionKE, "truthScatteredPionKE/D");
-    RecoEvalTree->Branch("truthSecondaryVertexX", &truthSecondaryVertexX, "truthSecondaryVertexX/D");
-    RecoEvalTree->Branch("truthSecondaryVertexY", &truthSecondaryVertexY, "truthSecondaryVertexY/D");
-    RecoEvalTree->Branch("truthSecondaryVertexZ", &truthSecondaryVertexZ, "truthSecondaryVertexZ/D");
-    RecoEvalTree->Branch("truthSecondaryPionDaughtersPDG", "std::vector<int>", &truthSecondaryPionDaughtersPDG); 
-    RecoEvalTree->Branch("truthSecondaryPionDaughtersProcess", "std::vector<std::string>", &truthSecondaryPionDaughtersProcess); 
-    RecoEvalTree->Branch("truthSecondaryPionDaughtersKE", "std::vector<double>", &truthSecondaryPionDaughtersKE); 
+    RecoAllEvalTree->Branch("truthScatteringAngle", &truthScatteringAngle, "truthScatteringAngle/D");
+    RecoAllEvalTree->Branch("truthScatteredPionLength", &truthScatteredPionLength, "truthScatteredPionLength/D");
+    RecoAllEvalTree->Branch("truthScatteredPionKE", &truthScatteredPionKE, "truthScatteredPionKE/D");
+    RecoAllEvalTree->Branch("truthSecondaryVertexX", &truthSecondaryVertexX, "truthSecondaryVertexX/D");
+    RecoAllEvalTree->Branch("truthSecondaryVertexY", &truthSecondaryVertexY, "truthSecondaryVertexY/D");
+    RecoAllEvalTree->Branch("truthSecondaryVertexZ", &truthSecondaryVertexZ, "truthSecondaryVertexZ/D");
+    RecoAllEvalTree->Branch("truthSecondaryPionDaughtersPDG", "std::vector<int>", &truthSecondaryPionDaughtersPDG); 
+    RecoAllEvalTree->Branch("truthSecondaryPionDaughtersProcess", "std::vector<std::string>", &truthSecondaryPionDaughtersProcess); 
+    RecoAllEvalTree->Branch("truthSecondaryPionDaughtersKE", "std::vector<double>", &truthSecondaryPionDaughtersKE); 
 
-    RecoEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
-    RecoEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryBeginX", &WC2TPCPrimaryBeginX, "WC2TPCPrimaryBeginX/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryBeginY", &WC2TPCPrimaryBeginY, "WC2TPCPrimaryBeginY/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryBeginZ", &WC2TPCPrimaryBeginZ, "WC2TPCPrimaryBeginZ/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryEndX", &WC2TPCPrimaryEndX, "WC2TPCPrimaryEndX/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryEndY", &WC2TPCPrimaryEndY, "WC2TPCPrimaryEndY/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryEndZ", &WC2TPCPrimaryEndZ, "WC2TPCPrimaryEndZ/D");
-    RecoEvalTree->Branch("WC2TPCPrimaryLength", &WC2TPCPrimaryLength, "WC2TPCPrimaryLength/D");
+    RecoAllEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
+    RecoAllEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryBeginX", &WC2TPCPrimaryBeginX, "WC2TPCPrimaryBeginX/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryBeginY", &WC2TPCPrimaryBeginY, "WC2TPCPrimaryBeginY/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryBeginZ", &WC2TPCPrimaryBeginZ, "WC2TPCPrimaryBeginZ/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryEndX", &WC2TPCPrimaryEndX, "WC2TPCPrimaryEndX/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryEndY", &WC2TPCPrimaryEndY, "WC2TPCPrimaryEndY/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryEndZ", &WC2TPCPrimaryEndZ, "WC2TPCPrimaryEndZ/D");
+    RecoAllEvalTree->Branch("WC2TPCPrimaryLength", &WC2TPCPrimaryLength, "WC2TPCPrimaryLength/D");
 
-    RecoEvalTree->Branch("WC3PrimaryX", &WC3PrimaryX, "WC3PrimaryX/D");
-    RecoEvalTree->Branch("WC3PrimaryY", &WC3PrimaryY, "WC3PrimaryY/D");
-    RecoEvalTree->Branch("WC3PrimaryZ", &WC3PrimaryZ, "WC3PrimaryZ/D");
-    RecoEvalTree->Branch("WC4PrimaryX", &WC4PrimaryX, "WC4PrimaryX/D");
-    RecoEvalTree->Branch("WC4PrimaryY", &WC4PrimaryY, "WC4PrimaryY/D");
-    RecoEvalTree->Branch("WC4PrimaryZ", &WC4PrimaryZ, "WC4PrimaryZ/D");
-    RecoEvalTree->Branch("WCMeanCurvature", &WCMeanCurvature, "WCMeanCurvature/D");
-    RecoEvalTree->Branch("WCMaxCurvature", &WCMaxCurvature, "WCMaxCurvature/D");
-    RecoEvalTree->Branch("WCTheta", &WCTheta, "WCTheta/D");
-    RecoEvalTree->Branch("WCPhi", &WCPhi, "WCPhi/D");
+    RecoAllEvalTree->Branch("WC3PrimaryX", &WC3PrimaryX, "WC3PrimaryX/D");
+    RecoAllEvalTree->Branch("WC3PrimaryY", &WC3PrimaryY, "WC3PrimaryY/D");
+    RecoAllEvalTree->Branch("WC3PrimaryZ", &WC3PrimaryZ, "WC3PrimaryZ/D");
+    RecoAllEvalTree->Branch("WC4PrimaryX", &WC4PrimaryX, "WC4PrimaryX/D");
+    RecoAllEvalTree->Branch("WC4PrimaryY", &WC4PrimaryY, "WC4PrimaryY/D");
+    RecoAllEvalTree->Branch("WC4PrimaryZ", &WC4PrimaryZ, "WC4PrimaryZ/D");
+    RecoAllEvalTree->Branch("WCMeanCurvature", &WCMeanCurvature, "WCMeanCurvature/D");
+    RecoAllEvalTree->Branch("WCMaxCurvature", &WCMaxCurvature, "WCMaxCurvature/D");
+    RecoAllEvalTree->Branch("WCTheta", &WCTheta, "WCTheta/D");
+    RecoAllEvalTree->Branch("WCPhi", &WCPhi, "WCPhi/D");
 
-    RecoEvalTree->Branch("wcMatchPDG", &wcMatchPDG, "wcMatchPDG/I");
-    RecoEvalTree->Branch("wcMatchProcess", "std::string", &wcMatchProcess);
-    RecoEvalTree->Branch("wcMatchDaughtersPDG", "std::vector<int>", &wcMatchDaughtersPDG);
-    RecoEvalTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
-    RecoEvalTree->Branch("wcMatchResR", "std::vector<double>", &wcMatchResR);
-    RecoEvalTree->Branch("wcMatchDEDX", "std::vector<double>", &wcMatchDEDX);
-    RecoEvalTree->Branch("wcMatchXPos", "std::vector<double>", &wcMatchXPos);
-    RecoEvalTree->Branch("wcMatchYPos", "std::vector<double>", &wcMatchYPos);
-    RecoEvalTree->Branch("wcMatchZPos", "std::vector<double>", &wcMatchZPos);
+    RecoAllEvalTree->Branch("wcMatchPDG", &wcMatchPDG, "wcMatchPDG/I");
+    RecoAllEvalTree->Branch("wcMatchProcess", "std::string", &wcMatchProcess);
+    RecoAllEvalTree->Branch("wcMatchDaughtersPDG", "std::vector<int>", &wcMatchDaughtersPDG);
+    RecoAllEvalTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
+    RecoAllEvalTree->Branch("wcMatchResR", "std::vector<double>", &wcMatchResR);
+    RecoAllEvalTree->Branch("wcMatchDEDX", "std::vector<double>", &wcMatchDEDX);
+    RecoAllEvalTree->Branch("wcMatchXPos", "std::vector<double>", &wcMatchXPos);
+    RecoAllEvalTree->Branch("wcMatchYPos", "std::vector<double>", &wcMatchYPos);
+    RecoAllEvalTree->Branch("wcMatchZPos", "std::vector<double>", &wcMatchZPos);
 
-    RecoEvalTree->Branch("WC2TPCLocationsX", "std::vector<double>", &WC2TPCLocationsX);
-    RecoEvalTree->Branch("WC2TPCLocationsY", "std::vector<double>", &WC2TPCLocationsY);
-    RecoEvalTree->Branch("WC2TPCLocationsZ", "std::vector<double>", &WC2TPCLocationsZ);
+    RecoAllEvalTree->Branch("WC2TPCLocationsX", "std::vector<double>", &WC2TPCLocationsX);
+    RecoAllEvalTree->Branch("WC2TPCLocationsY", "std::vector<double>", &WC2TPCLocationsY);
+    RecoAllEvalTree->Branch("WC2TPCLocationsZ", "std::vector<double>", &WC2TPCLocationsZ);
 
-    RecoEvalTree->Branch("isTrackInverted", "std::vector<bool>", &isTrackInverted);
-    RecoEvalTree->Branch("isTrackNearVertex", "std::vector<bool>", &isTrackNearVertex);
-    RecoEvalTree->Branch("recoTaggedAs", "std::vector<int>", &recoTaggedAs);
-    RecoEvalTree->Branch("recoBeginX", "std::vector<double>", &recoBeginX);
-    RecoEvalTree->Branch("recoBeginY", "std::vector<double>", &recoBeginY);
-    RecoEvalTree->Branch("recoBeginZ", "std::vector<double>", &recoBeginZ);
-    RecoEvalTree->Branch("recoEndX", "std::vector<double>", &recoEndX);
-    RecoEvalTree->Branch("recoEndY", "std::vector<double>", &recoEndY);
-    RecoEvalTree->Branch("recoEndZ", "std::vector<double>", &recoEndZ);
-    RecoEvalTree->Branch("recoTrkID", "std::vector<int>", &recoTrkID);
-    RecoEvalTree->Branch("recoPionChi2", "std::vector<double>", &recoPionChi2);
-    RecoEvalTree->Branch("recoProtonChi2", "std::vector<double>", &recoProtonChi2);
+    RecoAllEvalTree->Branch("isTrackInverted", "std::vector<bool>", &isTrackInverted);
+    RecoAllEvalTree->Branch("isTrackNearVertex", "std::vector<bool>", &isTrackNearVertex);
+    RecoAllEvalTree->Branch("recoTaggedAs", "std::vector<int>", &recoTaggedAs);
+    RecoAllEvalTree->Branch("recoBeginX", "std::vector<double>", &recoBeginX);
+    RecoAllEvalTree->Branch("recoBeginY", "std::vector<double>", &recoBeginY);
+    RecoAllEvalTree->Branch("recoBeginZ", "std::vector<double>", &recoBeginZ);
+    RecoAllEvalTree->Branch("recoEndX", "std::vector<double>", &recoEndX);
+    RecoAllEvalTree->Branch("recoEndY", "std::vector<double>", &recoEndY);
+    RecoAllEvalTree->Branch("recoEndZ", "std::vector<double>", &recoEndZ);
+    RecoAllEvalTree->Branch("recoTrkID", "std::vector<int>", &recoTrkID);
+    RecoAllEvalTree->Branch("recoPionChi2", "std::vector<double>", &recoPionChi2);
+    RecoAllEvalTree->Branch("recoProtonChi2", "std::vector<double>", &recoProtonChi2);
 
-    RecoEvalTree->Branch("matchedIdentity", "std::vector<int>", &matchedIdentity);
-    RecoEvalTree->Branch("matchedCleanliness", "std::vector<double>", &matchedCleanliness);
-    RecoEvalTree->Branch("matchedCompleteness", "std::vector<double>", &matchedCompleteness);
-    RecoEvalTree->Branch("matchedTrkID", "std::vector<int>", &matchedTrkID);
-    RecoEvalTree->Branch("matchedProcess", "std::vector<std::string>", &matchedProcess);
+    RecoAllEvalTree->Branch("matchedIdentity", "std::vector<int>", &matchedIdentity);
+    RecoAllEvalTree->Branch("matchedCleanliness", "std::vector<double>", &matchedCleanliness);
+    RecoAllEvalTree->Branch("matchedCompleteness", "std::vector<double>", &matchedCompleteness);
+    RecoAllEvalTree->Branch("matchedTrkID", "std::vector<int>", &matchedTrkID);
+    RecoAllEvalTree->Branch("matchedProcess", "std::vector<std::string>", &matchedProcess);
 
-    RecoEvalTree->Branch("matchedBeginX", "std::vector<double>", &matchedBeginX);
-    RecoEvalTree->Branch("matchedBeginY", "std::vector<double>", &matchedBeginY);
-    RecoEvalTree->Branch("matchedBeginY", "std::vector<double>", &matchedBeginY);
-    RecoEvalTree->Branch("matchedEndX", "std::vector<double>", &matchedEndX);
-    RecoEvalTree->Branch("matchedEndY", "std::vector<double>", &matchedEndY);
-    RecoEvalTree->Branch("matchedEndZ", "std::vector<double>", &matchedEndZ);
-    RecoEvalTree->Branch("matchedRealEndX", "std::vector<double>", &matchedRealEndX);
-    RecoEvalTree->Branch("matchedRealEndY", "std::vector<double>", &matchedRealEndY);
-    RecoEvalTree->Branch("matchedRealEndZ", "std::vector<double>", &matchedRealEndZ);
-    RecoEvalTree->Branch("matchedLength", "std::vector<double>", &matchedLength);
+    RecoAllEvalTree->Branch("matchedBeginX", "std::vector<double>", &matchedBeginX);
+    RecoAllEvalTree->Branch("matchedBeginY", "std::vector<double>", &matchedBeginY);
+    RecoAllEvalTree->Branch("matchedBeginY", "std::vector<double>", &matchedBeginY);
+    RecoAllEvalTree->Branch("matchedEndX", "std::vector<double>", &matchedEndX);
+    RecoAllEvalTree->Branch("matchedEndY", "std::vector<double>", &matchedEndY);
+    RecoAllEvalTree->Branch("matchedEndZ", "std::vector<double>", &matchedEndZ);
+    RecoAllEvalTree->Branch("matchedRealEndX", "std::vector<double>", &matchedRealEndX);
+    RecoAllEvalTree->Branch("matchedRealEndY", "std::vector<double>", &matchedRealEndY);
+    RecoAllEvalTree->Branch("matchedRealEndZ", "std::vector<double>", &matchedRealEndZ);
+    RecoAllEvalTree->Branch("matchedLength", "std::vector<double>", &matchedLength);
 
-    RecoEvalTree->Branch("matchedKEnergy", "std::vector<double>", &matchedKEnergy);
-    RecoEvalTree->Branch("matchedEndingKEnergy", "std::vector<double>", &matchedEndingKEnergy);
+    RecoAllEvalTree->Branch("matchedKEnergy", "std::vector<double>", &matchedKEnergy);
+    RecoAllEvalTree->Branch("matchedEndingKEnergy", "std::vector<double>", &matchedEndingKEnergy);
 
-    RecoEvalTree->Branch("matchedInitialPx", "std::vector<double>", &matchedInitialPx);
-    RecoEvalTree->Branch("matchedInitialPy", "std::vector<double>", &matchedInitialPy);
-    RecoEvalTree->Branch("matchedInitialPz", "std::vector<double>", &matchedInitialPz);
-    RecoEvalTree->Branch("matchedEndingPx", "std::vector<double>", &matchedEndingPx);
-    RecoEvalTree->Branch("matchedEndingPy", "std::vector<double>", &matchedEndingPy);
-    RecoEvalTree->Branch("matchedEndingPz", "std::vector<double>", &matchedEndingPz);
+    RecoAllEvalTree->Branch("matchedInitialPx", "std::vector<double>", &matchedInitialPx);
+    RecoAllEvalTree->Branch("matchedInitialPy", "std::vector<double>", &matchedInitialPy);
+    RecoAllEvalTree->Branch("matchedInitialPz", "std::vector<double>", &matchedInitialPz);
+    RecoAllEvalTree->Branch("matchedEndingPx", "std::vector<double>", &matchedEndingPx);
+    RecoAllEvalTree->Branch("matchedEndingPy", "std::vector<double>", &matchedEndingPy);
+    RecoAllEvalTree->Branch("matchedEndingPz", "std::vector<double>", &matchedEndingPz);
 
-    RecoEvalTree->Branch("recoDEDX","std::vector<std::vector<double>>",&recoDEDX);
-    RecoEvalTree->Branch("recoResR","std::vector<std::vector<double>>",&recoResR);
-    RecoEvalTree->Branch("recoXPos","std::vector<std::vector<double>>",&recoXPos);
-    RecoEvalTree->Branch("recoYPos","std::vector<std::vector<double>>",&recoYPos);
-    RecoEvalTree->Branch("recoZPos","std::vector<std::vector<double>>",&recoZPos);
-    RecoEvalTree->Branch("recoMeanDEDX","std::vector<double>",&recoMeanDEDX);
+    RecoAllEvalTree->Branch("recoDEDX","std::vector<std::vector<double>>",&recoDEDX);
+    RecoAllEvalTree->Branch("recoResR","std::vector<std::vector<double>>",&recoResR);
+    RecoAllEvalTree->Branch("recoXPos","std::vector<std::vector<double>>",&recoXPos);
+    RecoAllEvalTree->Branch("recoYPos","std::vector<std::vector<double>>",&recoYPos);
+    RecoAllEvalTree->Branch("recoZPos","std::vector<std::vector<double>>",&recoZPos);
+    RecoAllEvalTree->Branch("recoMeanDEDX","std::vector<double>",&recoMeanDEDX);
 
-    RecoEvalTree->Branch("passesPionInRedVolume", &passesPionInRedVolume, "passesPionInRedVolume/O");
-    RecoEvalTree->Branch("passesNoOutgoingPion", &passesNoOutgoingPion, "passesNoOutgoingPion/O");
-    RecoEvalTree->Branch("passesSmallTracksCut", &passesSmallTracksCut, "passesSmallTracksCut/O");
-    RecoEvalTree->Branch("passesMeanCurvatureCut", &passesMeanCurvatureCut, "passesMeanCurvatureCut/O");
+    RecoAllEvalTree->Branch("passesPionInRedVolume", &passesPionInRedVolume, "passesPionInRedVolume/O");
+    RecoAllEvalTree->Branch("passesNoOutgoingPion", &passesNoOutgoingPion, "passesNoOutgoingPion/O");
+    RecoAllEvalTree->Branch("passesSmallTracksCut", &passesSmallTracksCut, "passesSmallTracksCut/O");
+    RecoAllEvalTree->Branch("passesMeanCurvatureCut", &passesMeanCurvatureCut, "passesMeanCurvatureCut/O");
 
-    RecoEvalTree->Branch("numTaggedAsPions", &numTaggedAsPions, "numTaggedAsPions/I");
-    RecoEvalTree->Branch("numTaggedAsProton", &numTaggedAsProton, "numTaggedAsProton/I");
-    RecoEvalTree->Branch("numNotTagged", &numNotTagged, "numTaggenumNotTaggeddAsPions/I");
+    RecoAllEvalTree->Branch("numTaggedAsPions", &numTaggedAsPions, "numTaggedAsPions/I");
+    RecoAllEvalTree->Branch("numTaggedAsProton", &numTaggedAsProton, "numTaggedAsProton/I");
+    RecoAllEvalTree->Branch("numNotTagged", &numNotTagged, "numTaggenumNotTaggeddAsPions/I");
 
-    RecoEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
-    RecoEvalTree->Branch("fHitKey", "std::vector<int>", &fHitKey);
-    RecoEvalTree->Branch("fHitPlane", "std::vector<int>", &fHitPlane);
-    RecoEvalTree->Branch("fHitT", "std::vector<float>", &fHitT);
-    RecoEvalTree->Branch("fHitX", "std::vector<float>", &fHitX);
-    RecoEvalTree->Branch("fHitW", "std::vector<float>", &fHitW);
-    RecoEvalTree->Branch("fHitCharge", "std::vector<float>", &fHitCharge);
-    RecoEvalTree->Branch("fHitChargeCol", "std::vector<float>", &fHitChargeCol);
+    RecoAllEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
+    RecoAllEvalTree->Branch("fHitKey", "std::vector<int>", &fHitKey);
+    RecoAllEvalTree->Branch("fHitPlane", "std::vector<int>", &fHitPlane);
+    RecoAllEvalTree->Branch("fHitT", "std::vector<float>", &fHitT);
+    RecoAllEvalTree->Branch("fHitX", "std::vector<float>", &fHitX);
+    RecoAllEvalTree->Branch("fHitW", "std::vector<float>", &fHitW);
+    RecoAllEvalTree->Branch("fHitCharge", "std::vector<float>", &fHitCharge);
+    RecoAllEvalTree->Branch("fHitChargeCol", "std::vector<float>", &fHitChargeCol);
 
-    RecoEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
-    RecoEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
-    RecoEvalTree->Branch("primaryEndPointHitX", &primaryEndPointHitX, "primaryEndPointHitX/D");
-    RecoEvalTree->Branch("primaryEndPointHitW", &primaryEndPointHitW, "primaryEndPointHitW/D");
+    RecoAllEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
+    RecoAllEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
+    RecoAllEvalTree->Branch("primaryEndPointHitX", &primaryEndPointHitX, "primaryEndPointHitX/D");
+    RecoAllEvalTree->Branch("primaryEndPointHitW", &primaryEndPointHitW, "primaryEndPointHitW/D");
 }
 
-unsigned int RecoEval::lastPointInTPC(simb::MCParticle *track)
-{
+unsigned int RecoAllEval::lastPointInTPC(simb::MCParticle *track) {
   for (int i=track->NumberTrajectoryPoints()-1; i >=0; i--) {
     if (
       (track->Vx(i)>minX) && (track->Vx(i)<maxX) && 
@@ -1198,8 +1196,7 @@ unsigned int RecoEval::lastPointInTPC(simb::MCParticle *track)
   return 9999;
 }
 
-unsigned int RecoEval::lastPointInTPC(const art::Ptr<simb::MCParticle> track)
-{
+unsigned int RecoAllEval::lastPointInTPC(const art::Ptr<simb::MCParticle> track) {
   for (int i=track->NumberTrajectoryPoints()-1; i >=0; i--) {
     if (
       (track->Vx(i)>minX) && (track->Vx(i)<maxX) && 
@@ -1210,8 +1207,7 @@ unsigned int RecoEval::lastPointInTPC(const art::Ptr<simb::MCParticle> track)
   return 9999;
 }
 
-unsigned int RecoEval::firstPointInTPC(simb::MCParticle *track)
-{
+unsigned int RecoAllEval::firstPointInTPC(simb::MCParticle *track) {
   for (unsigned int i=0; i < track->NumberTrajectoryPoints(); ++i) {
     if (
       (track->Vx(i)>minX) && (track->Vx(i)<maxX) && 
@@ -1222,8 +1218,7 @@ unsigned int RecoEval::firstPointInTPC(simb::MCParticle *track)
   return 9999;
 }
 
-unsigned int RecoEval::firstPointInTPC(const art::Ptr<simb::MCParticle> track)
-{
+unsigned int RecoAllEval::firstPointInTPC(const art::Ptr<simb::MCParticle> track) {
   for (unsigned int i=0; i < track->NumberTrajectoryPoints(); ++i) {
     if (
       (track->Vx(i)>minX) && (track->Vx(i)<maxX) && 
@@ -1234,7 +1229,7 @@ unsigned int RecoEval::firstPointInTPC(const art::Ptr<simb::MCParticle> track)
   return 9999;
 }
 
-bool RecoEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim::ParticleList& plist) {
+bool RecoAllEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim::ParticleList& plist) {
     int motherTrackID = particle->Mother();
     int motherPosition = -1;
     for (size_t p = 0; p < plist.size(); ++p) {
@@ -1257,14 +1252,13 @@ bool RecoEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim::Parti
     return isPosterityOfPrimary(plist.Particle(motherPosition), plist);
 }
 
-double RecoEval::distance(double x1, double x2, double y1, double y2, double z1, double z2) {
+double RecoAllEval::distance(double x1, double x2, double y1, double y2, double z1, double z2) {
     return sqrt(
         pow(x1 - x2, 2) + pow(y1 - y2, 2) + pow(z1 - z2, 2)
     );
 }
 
-double RecoEval::trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2)
-{
+double RecoAllEval::trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2) {
   return sqrt(
     pow(track->Vx(cut2)-track->Vx(cut1),2) + 
     pow(track->Vy(cut2)-track->Vy(cut1),2) + 
@@ -1272,8 +1266,7 @@ double RecoEval::trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned
   );
 }
 
-double RecoEval::trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2)
-{
+double RecoAllEval::trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2) {
   return sqrt(
     pow(track->Vx(cut2)-track->Vx(cut1),2) + 
     pow(track->Vy(cut2)-track->Vy(cut1),2) + 
@@ -1281,8 +1274,7 @@ double RecoEval::trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsi
   );
 }
 
-double RecoEval::trackMagnitude(simb::MCParticle *track)
-{
+double RecoAllEval::trackMagnitude(simb::MCParticle *track) {
   return sqrt(
     pow(track->EndX()-track->Vx(0),2) + 
     pow(track->EndY()-track->Vy(0),2) + 
@@ -1290,7 +1282,7 @@ double RecoEval::trackMagnitude(simb::MCParticle *track)
   );
 }
 
-bool RecoEval::isWithinActiveVolume(double x, double y, double z) {
+bool RecoAllEval::isWithinActiveVolume(double x, double y, double z) {
     if (x < minX ) return false; 
     if (x > maxX ) return false;
     if (y < minY ) return false; 
@@ -1300,7 +1292,7 @@ bool RecoEval::isWithinActiveVolume(double x, double y, double z) {
     return true;
 }
 
-bool RecoEval::isWithinReducedVolume(simb::MCParticle *track) {
+bool RecoAllEval::isWithinReducedVolume(simb::MCParticle *track) {
     return (
       (track->EndX()>RminX) && (track->EndX()<RmaxX) && 
       (track->EndY()>RminY) && (track->EndY()<RmaxY) && 
@@ -1308,7 +1300,7 @@ bool RecoEval::isWithinReducedVolume(simb::MCParticle *track) {
     );
 }
 
-bool RecoEval::isWithinReducedVolume(double x, double y, double z) {
+bool RecoAllEval::isWithinReducedVolume(double x, double y, double z) {
     return (
         (x > RminX) && (x < RmaxX) && 
         (y > RminY) && (y < RmaxY) && 
@@ -1316,7 +1308,7 @@ bool RecoEval::isWithinReducedVolume(double x, double y, double z) {
     );
 }
 
-void RecoEval::fillSignalInformation(
+void RecoAllEval::fillSignalInformation(
     int pdg,
     double vx, double vy, double vz,
     std::vector<int> daughtersPDG, 
@@ -1363,7 +1355,7 @@ void RecoEval::fillSignalInformation(
     return;
 }
 
-void RecoEval::fillBackgroundInformation(
+void RecoAllEval::fillBackgroundInformation(
     int pdg,
     double vx, double vy, double vz,
     std::vector<int> daughtersPDG, 
@@ -1410,7 +1402,7 @@ void RecoEval::fillBackgroundInformation(
     if (backgroundType == -1) backgroundType = 11;
 }
 
-std::tuple<double, double> RecoEval::computeCurvature(recob::Track track) {
+std::tuple<double, double> RecoAllEval::computeCurvature(recob::Track track) {
     double meanCurvature = 0;
     double maxCurvature  = 0;
     for (size_t iPoint = 0; iPoint < track.NPoints() - 2; iPoint++) {
@@ -1430,7 +1422,7 @@ std::tuple<double, double> RecoEval::computeCurvature(recob::Track track) {
     return std::make_tuple(meanCurvature, maxCurvature);
 }
 
-double RecoEval::curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3) {
+double RecoAllEval::curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3) {
     // From: https://en.wikipedia.org/wiki/Circumcircle#Cartesian_coordinates_from_cross-_and_dot-products 
   
     // Edges of a triangle
@@ -1452,7 +1444,7 @@ double RecoEval::curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3) 
     return (2 * ww) / (tt * uu * vv);
 }
 
-double RecoEval::meanDEDX(
+double RecoAllEval::meanDEDX(
     art::FindManyP<anab::Calorimetry> fmcal, 
     unsigned int trackKey, 
     bool isThisTrackReversed,
@@ -1526,7 +1518,7 @@ double RecoEval::meanDEDX(
     return meanDEDX;
 }
 
-double RecoEval::computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints) {
+double RecoAllEval::computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints) {
     double chi2 = 0.0;
 
     for (int i = 0; i < nPoints; ++i) {
@@ -1540,7 +1532,7 @@ double RecoEval::computeReducedChi2(const TGraph* theory, std::vector<double> xD
     return dof > 0 ? chi2 / dof : 0.0; 
 }
 
-void RecoEval::initializeProtonPoints(TGraph* gProton) {
+void RecoAllEval::initializeProtonPoints(TGraph* gProton) {
     double protonData[107][2] = {
         {31.95, 4.14}, {31.65, 4.16}, {31.35, 4.17}, {31.05, 4.18}, {30.75, 4.20},
         {30.45, 4.21}, {30.15, 4.23}, {29.85, 4.25}, {29.55, 4.26}, {29.25, 4.28},
@@ -1571,7 +1563,7 @@ void RecoEval::initializeProtonPoints(TGraph* gProton) {
     }
 }
 
-void RecoEval::initializePionPoints(TGraph* gPion) {
+void RecoAllEval::initializePionPoints(TGraph* gPion) {
     double pionData[107][2] = {
         {31.95, 2.4}, {31.65, 2.4}, {31.35, 2.4}, {31.05, 2.4}, {30.75, 2.4},
         {30.45, 2.4}, {30.15, 2.4}, {29.85, 2.4}, {29.55, 2.4}, {29.25, 2.4},
@@ -1603,7 +1595,7 @@ void RecoEval::initializePionPoints(TGraph* gPion) {
 }
 
 
-void RecoEval::resetTree() {
+void RecoAllEval::resetTree() {
     numTaggedAsPions  = 0;
     numTaggedAsProton = 0;
     numNotTagged      = 0;
@@ -1712,11 +1704,11 @@ void RecoEval::resetTree() {
     primaryEndPointHitW = 0.;
 }
 
-void RecoEval::endJob() {
+void RecoAllEval::endJob() {
     
 }
 
-void RecoEval::reconfigure(fhicl::ParameterSet const & p) {
+void RecoAllEval::reconfigure(fhicl::ParameterSet const & p) {
     bVerbose = p.get<bool>("Verbose", false);
     strWCTrackBuilderLabel             = p.get<std::string>("WCTrackBuilderLabel", "wctrack");
     strTPCTrackHandleLabel             = p.get<std::string>("TPCTrackHandleLabel", "pmtrack");
@@ -1741,4 +1733,4 @@ void RecoEval::reconfigure(fhicl::ParameterSet const & p) {
     PROTON_CHI2_PROTON_VALUE = p.get<double>("ProtonChi2ProtonValue", 5.);
 }
 
-DEFINE_ART_MODULE(RecoEval)
+DEFINE_ART_MODULE(RecoAllEval)
