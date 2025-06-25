@@ -142,14 +142,41 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
 
-        // Cross-section histograms
+        // Cross-section signal histograms
         TH1D *hCrossSection;
         TH1D *hCrossSectionEl;
         TH1D *hCrossSectionInel;
-
         TH1D *hCrossSectionPionAbs;
         TH1D *hCrossSectionPionAbs0p;
         TH1D *hCrossSectionPionAbsNp;
+
+        // Cross-section background histograms
+        TH1D *hCrossSectionOutsideRedVolume;
+        TH1D *hCrossSectionPionInelastic;
+        TH1D *hCrossSectionChargeExchange;
+        TH1D *hCrossSectionDoubleChargeExchange;
+        TH1D *hCrossSectionCaptureAtRest;
+        TH1D *hCrossSectionDecay;
+        TH1D *hCrossSectionOther;
+
+        // Kinetic energy signal histograms
+        TH1D *hIncidentKE;
+        TH1D *hInteractingKE; 
+        TH1D *hInteractingKEEl; 
+        TH1D *hInteractingKEElDep; 
+        TH1D *hInteractingKEInel; 
+        TH1D *hInteractingKEPionAbs;
+        TH1D *hInteractingKEPionAbs0p;
+        TH1D *hInteractingKEPionAbsNp;
+
+        // Kinetic energy background histograms
+        TH1D *hInteractingKEOutsideRedVolume;
+        TH1D *hInteractingKEPionInelastic;
+        TH1D *hInteractingKEChargeExchange;
+        TH1D *hInteractingKEDoubleChargeExchange;
+        TH1D *hInteractingKECaptureAtRest;
+        TH1D *hInteractingKEDecay;
+        TH1D *hInteractingKEOther;
 
         TH1D*   h_DE   ;
         TH1D*   h_DX   ;
@@ -162,15 +189,6 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         TH1D*   h_DeltaE ;
         TH1D*   h_SimIDEDist ;
         TH1D*   h_UniformDistances ;
-
-        TH1D *hInteractingKE; 
-        TH1D *hInteractingKEEl; 
-        TH1D *hInteractingKEElDep; 
-        TH1D *hInteractingKEInel; 
-        TH1D *hInteractingKEPionAbs;
-        TH1D *hInteractingKEPionAbs0p;
-        TH1D *hInteractingKEPionAbsNp;
-        TH1D *hIncidentKE;
 
         TH1D *hKEAtTPCFF; 
         TH1D *hInitialKE; 
@@ -318,10 +336,9 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 
     // Looping over all the Geant4 particles from the BackTracker
     for (size_t p = 0; p < plist.size(); ++p) {
-        // Get the true particle and its process, skip whatever is not primary 
+        // Only continue if it is a primary pion
         auto mcPart = plist.Particle(p);
-        std::string proc = mcPart->Process();
-        if (!(proc.find("primary") != std::string::npos)) continue;
+        if (!((mcPart->Process().find("primary") != std::string::npos) && (mcPart->PdgCode() == -211))) continue;
 
         // Get the True Trajectory point
         simb::MCTrajectory truetraj = mcPart->Trajectory();
@@ -405,14 +422,14 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 	    } // If there are G4 interactions
       
 
-        // If I didn't find anything interesting in the intereaction map, let's loop back!
+        // If I didn't find anything interesting in the interaction map, let's loop back!
         if (!keepInteraction) {
 	        // Loop on the daughters
 	        for(size_t d = 0; d < plist.size(); ++d) {
                 auto mcDaught = plist.Particle(d);
-                // We keep only the dauthers of the primary not coming from elastic or inelastic scattering
-                if (mcDaught->Mother()  != 1 ) continue;
-                if ((mcDaught->Process()).find("astic")!= std::string::npos) continue;
+                // We keep only the daughters of the primary not coming from elastic or inelastic scattering
+                if (mcDaught->Mother() != 1) continue;
+                if ((mcDaught->Process()).find("astic") != std::string::npos) continue;
                 if ((mcDaught->Process()).find("CoulombScat")!= std::string::npos) continue;
 
                 // Is the daughter born inside the TPC? If yes, store the process which created it 
@@ -426,13 +443,12 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
                 }
             }
 
-	        for (auto t = std::prev(truetraj.end()); t!= truetraj.begin(); t--) {
+	        for (auto t = std::prev(truetraj.end()); t != truetraj.begin(); t--) {
 	            auto pos = t->first;
 	            if (pos.Z() > maxZ) continue;
 	            else if (pos.X() <   minX || pos.X() > maxX ) continue;
 	            else if (pos.Y() <   minY || pos.Y() > maxY ) continue;
 	            else {
-		            //std::cout<<"Daugthers: "<<interactionLabel<<" at ("<< pos.X()<<","<<pos.Y()<<","<<pos.Z() <<")\n";
 		            finTPCPoint = t;
 		            break;
 	            }
@@ -494,9 +510,9 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 
         if (lastDist < 0.235) {
 	        orderedUniformTrjPts.erase((std::next(orderedUniformTrjPts.rbegin()))->first );
-	    } 
+	    }
 
-        //Some other stupid check
+        // Some other stupid check
         if (verbose) {
             lastPt         = (orderedUniformTrjPts.rbegin())->second;
             secondtoLastPt = (std::next(orderedUniformTrjPts.rbegin()))->second;
@@ -547,10 +563,14 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             h_DXUniform->Fill(uniformDist);
             h_DEDXUniform->Fill(currentDepEnergy / uniformDist);
         } // Loop on OrderedPoints
-      
+
+        // Fill histogram considering ALL interactions
+        if (interactionLabel.size()) {
+            hInteractingKE->Fill(kineticEnergy);
+        }
+
         if (interactionLabel.find("Inelastic") != std::string::npos) {
 	        // std::cout<<"Interaction Label: "<<interactionLabel<<"\n";
-	        hInteractingKE->Fill(kineticEnergy);
 	        hInteractingKEInel->Fill(kineticEnergy);
 	    }
       
@@ -558,12 +578,13 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         if (interactionLabel.find("Elastic") != std::string::npos) {
             h_DeltaE->Fill(kineticEnergy - 1000 * ((finTPCPoint->second).E() - mass));
             hInteractingKEElDep->Fill(kineticEnergy);
-            hInteractingKE->Fill(kineticEnergy);
             auto MomentumF = finTPCPoint->second;
             double KEF = 1000*(TMath::Sqrt(MomentumF.X()*MomentumF.X() + MomentumF.Y()*MomentumF.Y() + MomentumF.Z()*MomentumF.Z() + mass*mass ) - mass); // I want this in MeV
             hInteractingKEEl->Fill(KEF);
 	    }
 
+
+        // Fill pion absorption histograms
         if (isPionAbsorptionSignal) {
             hInteractingKEPionAbs->Fill(kineticEnergy);
             if (numVisibleProtons == 0) {
@@ -571,6 +592,23 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             } else if (numVisibleProtons > 0) {
                 hInteractingKEPionAbsNp->Fill(kineticEnergy);
             }
+        }
+
+        // Fill background histograms
+        if (backgroundType == 5) {
+            hInteractingKEOutsideRedVolume->Fill(kineticEnergy);
+        } else if (backgroundType == 6) {
+            hInteractingKEPionInelastic->Fill(kineticEnergy);
+        } else if (backgroundType == 7) {
+            hInteractingKEChargeExchange->Fill(kineticEnergy);
+        } else if (backgroundType == 8) {
+            hInteractingKEDoubleChargeExchange->Fill(kineticEnergy);
+        } else if (backgroundType == 9) {
+            hInteractingKECaptureAtRest->Fill(kineticEnergy);
+        } else if (backgroundType == 10) {
+            hInteractingKEDecay->Fill(kineticEnergy);
+        } else if (backgroundType == 11) {
+            hInteractingKEOther->Fill(kineticEnergy);
         }
 
         finalKE = kineticEnergy;
@@ -613,9 +651,19 @@ void lariat::TrueXSPionAbs::endJob() {
         float elCrossSection   = ((hInteractingKEEl->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float inelCrossSection = ((hInteractingKEInel->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
 	
+        // Cross-section for pion absorption
         float crossSectionPionAbs   = ((hInteractingKEPionAbs->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionPionAbs0p = ((hInteractingKEPionAbs0p->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionPionAbsNp = ((hInteractingKEPionAbsNp->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+
+        // Cross-section for background interactions
+        float crossSectionOutsideRedVolume     = ((hInteractingKEOutsideRedVolume->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionPionInelastic        = ((hInteractingKEPionInelastic->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionChargeExchange       = ((hInteractingKEChargeExchange->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionDoubleChargeExchange = ((hInteractingKEDoubleChargeExchange->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionCaptureAtRest        = ((hInteractingKECaptureAtRest->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionDecay                = ((hInteractingKEDecay->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionOther                = ((hInteractingKEOther->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
 
         // Putting the value on the histogram
         hCrossSection    ->SetBinContent(iBin, crossSection);
@@ -625,6 +673,14 @@ void lariat::TrueXSPionAbs::endJob() {
         hCrossSectionPionAbs  ->SetBinContent(iBin, crossSectionPionAbs);
         hCrossSectionPionAbs0p->SetBinContent(iBin, crossSectionPionAbs0p);
         hCrossSectionPionAbsNp->SetBinContent(iBin, crossSectionPionAbsNp);
+
+        hCrossSectionOutsideRedVolume    ->SetBinContent(iBin, crossSectionOutsideRedVolume);
+        hCrossSectionPionInelastic       ->SetBinContent(iBin, crossSectionPionInelastic);
+        hCrossSectionChargeExchange      ->SetBinContent(iBin, crossSectionChargeExchange);
+        hCrossSectionDoubleChargeExchange->SetBinContent(iBin, crossSectionDoubleChargeExchange);
+        hCrossSectionCaptureAtRest       ->SetBinContent(iBin, crossSectionCaptureAtRest);
+        hCrossSectionDecay               ->SetBinContent(iBin, crossSectionDecay);
+        hCrossSectionOther               ->SetBinContent(iBin, crossSectionOther);
 
         // Calculating the error on the numerator of the ratio
         float denomError = std::pow(hIncidentKE->GetBinContent(iBin), 0.5);
@@ -649,6 +705,27 @@ void lariat::TrueXSPionAbs::endJob() {
 
         float numErrorPionAbsNp = std::pow(hInteractingKEPionAbsNp->GetBinContent(iBin), 0.5);
         float numPionAbsNp      = hInteractingKEPionAbsNp->GetBinContent(iBin);
+
+        float numErrorOutsideRedVolume = std::pow(hInteractingKEOutsideRedVolume->GetBinContent(iBin), 0.5);
+        float numOutsideRedVolume      = hInteractingKEOutsideRedVolume->GetBinContent(iBin);
+
+        float numErrorPionInelastic = std::pow(hInteractingKEPionInelastic->GetBinContent(iBin), 0.5);
+        float numPionInelastic      = hInteractingKEPionInelastic->GetBinContent(iBin); 
+
+        float numErrorChargeExchange = std::pow(hInteractingKEChargeExchange->GetBinContent(iBin), 0.5);
+        float numChargeExchange      = hInteractingKEChargeExchange->GetBinContent(iBin);
+
+        float numErrorDoubleChargeExchange = std::pow(hInteractingKEDoubleChargeExchange->GetBinContent(iBin), 0.5);
+        float numDoubleChargeExchange      = hInteractingKEDoubleChargeExchange->GetBinContent(iBin);
+
+        float numErrorCaptureAtRest = std::pow(hInteractingKECaptureAtRest->GetBinContent(iBin), 0.5);
+        float numCaptureAtRest      = hInteractingKECaptureAtRest->GetBinContent(iBin);
+
+        float numErrorDecay = std::pow(hInteractingKEDecay->GetBinContent(iBin), 0.5);
+        float numDecay      = hInteractingKEDecay->GetBinContent(iBin);
+
+        float numErrorOther = std::pow(hInteractingKEOther->GetBinContent(iBin), 0.5);
+        float numOther      = hInteractingKEOther->GetBinContent(iBin);
 
         // Putting in a protection against dividing by zero 
         if (num != 0) {
@@ -686,6 +763,48 @@ void lariat::TrueXSPionAbs::endJob() {
             float totalError = (crossSectionPionAbsNp) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
             hCrossSectionPionAbsNp->SetBinError(iBin, totalError);
         }
+
+        if (numOutsideRedVolume != 0) {
+            float term1      = numErrorOutsideRedVolume / numOutsideRedVolume;
+            float totalError = (crossSectionOutsideRedVolume) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionOutsideRedVolume->SetBinError(iBin, totalError);
+        }
+
+        if (numPionInelastic != 0) {
+            float term1      = numErrorPionInelastic / numPionInelastic;
+            float totalError = (crossSectionPionInelastic) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionPionInelastic->SetBinError(iBin, totalError);
+        }
+
+        if (numChargeExchange != 0) {
+            float term1      = numErrorChargeExchange / numChargeExchange;
+            float totalError = (crossSectionChargeExchange) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionChargeExchange->SetBinError(iBin, totalError);
+        }
+
+        if (numDoubleChargeExchange != 0) {
+            float term1      = numErrorDoubleChargeExchange / numDoubleChargeExchange;
+            float totalError = (crossSectionDoubleChargeExchange) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionDoubleChargeExchange->SetBinError(iBin, totalError);
+        }
+
+        if (numCaptureAtRest != 0) {
+            float term1      = numErrorCaptureAtRest / numCaptureAtRest;
+            float totalError = (crossSectionCaptureAtRest) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionCaptureAtRest->SetBinError(iBin, totalError);
+        }
+
+        if (numDecay != 0) {
+            float term1      = numErrorDecay / numDecay;
+            float totalError = (crossSectionDecay) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionDecay->SetBinError(iBin, totalError);
+        }
+
+        if (numOther != 0) {
+            float term1      = numErrorOther / numOther;
+            float totalError = (crossSectionOther) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionOther->SetBinError(iBin, totalError);
+        }
     } // End bin loop
 }
 
@@ -718,9 +837,18 @@ void lariat::TrueXSPionAbs::beginJob() {
     hInteractingKEEl    = tfs->make<TH1D>("hInteractingKEEl", "Elastic Interacting Kinetic Energy [MeV]", 42, -100, 2000); 
     hInteractingKEElDep = tfs->make<TH1D>("hInteractingKEElDep", "Dep Elastic Interacting Kinetic Energy [MeV]", 42, -100, 2000); 
     hInteractingKEInel  = tfs->make<TH1D>("hInteractingKEInel", "Inelastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+
     hInteractingKEPionAbs   = tfs->make<TH1D>("hInteractingKEPionAbs", "Pion Absorption Interacting Kinetic Energy [MeV]", 42, -100, 2000);
     hInteractingKEPionAbs0p = tfs->make<TH1D>("hInteractingKEPionAbs0p", "Pion Absorption 0p Interacting Kinetic Energy [MeV]", 42, -100, 2000);
     hInteractingKEPionAbsNp = tfs->make<TH1D>("hInteractingKEPionAbsNp", "Pion Absorption Np Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+
+    hInteractingKEOutsideRedVolume = tfs->make<TH1D>("hInteractingKEOutsideRedVolume", "Outside Reduced Volume Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEPionInelastic     = tfs->make<TH1D>("hInteractingKEPionInelastic", "Pion Inelastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEChargeExchange      = tfs->make<TH1D>("hInteractingKEChargeExchange", "Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEDoubleChargeExchange = tfs->make<TH1D>("hInteractingKEDoubleChargeExchange", "Double Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKECaptureAtRest       = tfs->make<TH1D>("hInteractingKECaptureAtRest", "Capture At Rest Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEDecay               = tfs->make<TH1D>("hInteractingKEDecay", "Decay Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEOther               = tfs->make<TH1D>("hInteractingKEOther", "Other Interacting Kinetic Energy [MeV]", 42, -100, 2000);
 
     hCrossSection     = tfs->make<TH1D>("hCrossSection"     , "Cross-Section [barn]"             , 42, -100, 2000);
     hCrossSectionEl   = tfs->make<TH1D>("hCrossSectionEl"   , "Elastic Cross-Section [barn]"     , 42, -100, 2000);
@@ -729,6 +857,14 @@ void lariat::TrueXSPionAbs::beginJob() {
     hCrossSectionPionAbs   = tfs->make<TH1D>("hCrossSectionPionAbs", "Pion Absorption Cross-Section [barn]", 42, -100, 2000);
     hCrossSectionPionAbs0p = tfs->make<TH1D>("hCrossSectionPionAbs0p", "Pion Absorption 0p Cross-Section [barn]", 42, -100, 2000);
     hCrossSectionPionAbsNp = tfs->make<TH1D>("hCrossSectionPionAbsNp", "Pion Absorption Np Cross-Section [barn]", 42, -100, 2000);
+
+    hCrossSectionOutsideRedVolume    = tfs->make<TH1D>("hCrossSectionOutsideRedVolume", "Outside Reduced Volume Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionPionInelastic       = tfs->make<TH1D>("hCrossSectionPionInelastic", "Pion Inelastic Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionChargeExchange      = tfs->make<TH1D>("hCrossSectionChargeExchange", "Charge Exchange Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionDoubleChargeExchange = tfs->make<TH1D>("hCrossSectionDoubleChargeExchange", "Double Charge Exchange Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionCaptureAtRest       = tfs->make<TH1D>("hCrossSectionCaptureAtRest", "Capture At Rest Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionDecay               = tfs->make<TH1D>("hCrossSectionDecay", "Decay Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionOther               = tfs->make<TH1D>("hCrossSectionOther", "Other Cross-Section [barn]", 42, -100, 2000);
 
     hXZ    = tfs->make<TH2D>("hXZ"     , "hXZ"    , 110, -100, 10, 200, -100, 100);  
     hYZ    = tfs->make<TH2D>("hYZ"     , "hYZ"    , 110, -100, 10, 200, -100, 100); 
