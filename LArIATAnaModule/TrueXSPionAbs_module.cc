@@ -395,14 +395,24 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         // Identify the last interesting trajectory point in TPC
         auto finTPCPoint = std::prev(truetraj.end()); 
         // The last point is a bit more complicated:
-        //  if there's no interaction, then it is simply the last point in the TPC
-        //  if there's one or more interaction points, it's the first interaction point deemed interesting (no coulomb)
+        //    if there's no interaction, then it is simply the last point in the TPC
+        //    if there's one or more interaction points, it's the first interaction point deemed interesting (no coulomb)
         // Take the interaction Map... check if there's something there
         auto thisTracjectoryProcessMap =  truetraj.TrajectoryProcesses();
+
+        if (backgroundType == 9) {
+            if (verbose) std::cout << "Capture at rest event, all interactions from process map:" << std::endl;
+            if (verbose) std::cout << "Primary vertex z: " << truthPrimaryVertexZ << std::endl;
+
+            for (auto const& couple : thisTracjectoryProcessMap) {
+                if (verbose) std::cout << "  Process: " << truetraj.KeyToProcess(couple.second) << " Position: " << ((truetraj.at(couple.first)).first).Z() << "\n";
+            }
+        }
+
         if (thisTracjectoryProcessMap.size()) {
 	        for(auto const& couple: thisTracjectoryProcessMap) { 
 	            // I'm not interested in the CoulombScattering, discart this case
-	            if (verbose) std::cout<<(truetraj.KeyToProcess(couple.second))<<" Position "<< ((truetraj.at(couple.first)).first).Z() <<"\n";
+	            // if (verbose) std::cout<<(truetraj.KeyToProcess(couple.second))<<" Position "<< ((truetraj.at(couple.first)).first).Z() <<"\n";
 	            if ((truetraj.KeyToProcess(couple.second)).find("CoulombScat")!= std::string::npos) continue;
 	      
 	            // Let's check if the interaction is in the the TPC
@@ -410,6 +420,12 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 	            if      (interactionPos4D.Z() <  minZ || interactionPos4D.Z() > maxZ ) continue;
 	            else if (interactionPos4D.X() <  minX || interactionPos4D.X() > maxX ) continue;
 	            else if (interactionPos4D.Y() <  minY || interactionPos4D.Y() > maxY ) continue;
+
+                // TODO: remove
+                if (backgroundType == 9) {
+                    if (verbose) std::cout << "Interaction at Z position: " << ((truetraj.at(couple.first)).first).Z() << " with process " << truetraj.KeyToProcess(couple.second) << "\n";
+                    if (verbose) std::cout << std::endl;
+                }
 
 	            // If we made it here, then this is the first interesting interaction in the TPC
 	            // Our job is done!!! Great! Store the interaction label and the iterator for the final point
@@ -420,7 +436,6 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 	            break;
 	        } // Loop on interaction points
 	    } // If there are G4 interactions
-      
 
         // If I didn't find anything interesting in the interaction map, let's loop back!
         if (!keepInteraction) {
@@ -473,21 +488,21 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         // Let's use them!
         // But first, some stupid checks
         if (verbose) {
-	        std::cout<<"True Vtx X: "<<posIni.X()<<" Y: "<<posIni.Y()<<" Z: "<<posIni.Z()<<"\n";
-	        for (auto const& t : truetraj) {
-                auto pos = t.first;
-                std::cout<<"------------------> "<<pos.X()<<" "<<pos.Y() <<" "<<pos.Z()<<" \n";
-	        }
+	        std::cout<<"True Init X: "<<posIni.X()<<" Y: "<<posIni.Y()<<" Z: "<<posIni.Z()<<"\n";
+	        // for (auto const& t : truetraj) {
+            //     auto pos = t.first;
+            //     std::cout<<"------------------> "<<pos.X()<<" "<<pos.Y() <<" "<<pos.Z()<<" \n";
+	        // }
 	        std::cout<<"True End X: "<<posFin.X()<<" Y: "<<posFin.Y()<<" Z: "<<posFin.Z()<<"-----> "<< interactionLabel<<"\n\n";
-	        std::cout<<"\n\n\n";
+	        std::cout<<std::endl;;
 	    }
 
         // We want to chop up the points between the fist and list uniformely
-        // and ordered by Z
-        // Order them in order of increasing Z
+        // and ordered them in order of increasing Z
         std::map<double, TVector3> orderedUniformTrjPts;
+
         // We want the first and last uniform point to coincide with the 
-        // the first and last points we just found 
+        // the first and last points we just found
         auto positionVector0 = (inTPCPoint ->first).Vect(); 
         auto positionVector1 = (finTPCPoint->first).Vect(); 
         orderedUniformTrjPts[positionVector0.Z()] = positionVector0;
@@ -498,25 +513,21 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         // Calculate how many extra points I need to put between the new first point and the second TrajPoint
         int nPts = (int) (totLength/trackPitch);
         for (int iPt = 1; iPt <= nPts; iPt++) {
-	        auto newPoint = positionVector0 + iPt*(trackPitch/totLength) * (positionVector1 - positionVector0);
+	        auto newPoint = positionVector0 + iPt * (trackPitch / totLength) * (positionVector1 - positionVector0);
 	        orderedUniformTrjPts[newPoint.Z()] = newPoint;
 	    }
 
-        // If the distance between the last point and the second to last is less then 0.235
-        // eliminate the second to last point
+        // If the distance between the last point and the second to last is less then 0.235 eliminate the second to last point
         auto lastPt         = (orderedUniformTrjPts.rbegin())->second;
         auto secondtoLastPt = (std::next(orderedUniformTrjPts.rbegin()))->second;
-        double lastDist = distance(lastPt.X(),lastPt.Y(),lastPt.Z(),secondtoLastPt.X(),secondtoLastPt.Y(),secondtoLastPt.Z());
-
-        if (lastDist < 0.235) {
-	        orderedUniformTrjPts.erase((std::next(orderedUniformTrjPts.rbegin()))->first );
-	    }
+        double lastDist     = distance(lastPt.X(), lastPt.Y(), lastPt.Z(), secondtoLastPt.X(), secondtoLastPt.Y(), secondtoLastPt.Z());
+        if (lastDist < 0.235) { orderedUniformTrjPts.erase((std::next(orderedUniformTrjPts.rbegin()))->first); }
 
         // Some other stupid check
         if (verbose) {
             lastPt         = (orderedUniformTrjPts.rbegin())->second;
             secondtoLastPt = (std::next(orderedUniformTrjPts.rbegin()))->second;
-            lastDist = distance(lastPt.X(),lastPt.Y(),lastPt.Z(),secondtoLastPt.X(),secondtoLastPt.Y(),secondtoLastPt.Z());
+            lastDist       = distance(lastPt.X(), lastPt.Y(), lastPt.Z(), secondtoLastPt.X(), secondtoLastPt.Y(), secondtoLastPt.Z());
             
             std::cout<<"True End X: "<<posFin.X()<<" Y: "<<posFin.Y()<<" Z: "<<posFin.Z()<<"-----> "<< interactionLabel<<"\n";
             std::cout<<"True End X: "<<lastPt.X()<<" Y: "<<lastPt.Y()<<" Z: "<<lastPt.Z()<<"-----> "<< interactionLabel<<"\n";
@@ -524,16 +535,14 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             std::cout<<"lastDist "<<lastDist<<"\n\n\n";
 	    }      
 
-
         // Calculate the initial kinetic energy
         auto   initialMom = inTPCPoint->second;
         double initialKE  = 1000 * (TMath::Sqrt(initialMom.X()*initialMom.X() + initialMom.Y()*initialMom.Y() + initialMom.Z()*initialMom.Z() + mass * mass) - mass); 
         hKEAtTPCFF->Fill(initialKE);
         double kineticEnergy = initialKE;
 
-        auto old_it = orderedUniformTrjPts.begin();
-        for (auto it = std::next(orderedUniformTrjPts.begin()); it != orderedUniformTrjPts.end(); it++, old_it++) {
-	        if (verbose)  std::cout << it->first<<" : " << (it->second).Z() << std::endl ;
+        for (auto it = std::next(orderedUniformTrjPts.begin()), old_it = orderedUniformTrjPts.begin(); it != orderedUniformTrjPts.end(); it++, old_it++) {
+	        // if (verbose)  std::cout << it->first<<" : " << (it->second).Z() << std::endl ;
 
 	        auto oldPos        = old_it->second;
 	        auto currentPos    =     it->second;
@@ -573,7 +582,7 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 	        // std::cout<<"Interaction Label: "<<interactionLabel<<"\n";
 	        hInteractingKEInel->Fill(kineticEnergy);
 	    }
-      
+
         // Fill the Elastic and Total Interacting with the last point
         if (interactionLabel.find("Elastic") != std::string::npos) {
             h_DeltaE->Fill(kineticEnergy - 1000 * ((finTPCPoint->second).E() - mass));

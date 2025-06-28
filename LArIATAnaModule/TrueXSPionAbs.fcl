@@ -24,11 +24,11 @@ source: {
 physics: {
     analyzers: {
         TrueXSPionAbs: {
-            module_type:      "TrueXSPionAbs"
-            Verbose:          false
-            SimulationLabel:  largeant
-            ProtonEnergyLowerBound:   0.075
-            ProtonEnergyUpperBound:   1.0
+            module_type:            "TrueXSPionAbs"
+            Verbose:                true
+            SimulationLabel:        largeant
+            ProtonEnergyLowerBound: 0.075
+            ProtonEnergyUpperBound: 1.0
         }
     }
     
