@@ -225,8 +225,8 @@ class RecoAllEval : public art::EDAnalyzer {
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
         double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
         std::tuple<double, double> computeCurvature(recob::Track track);
-        void fillSignalInformation(int pdg, double vx, double vy, double vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
-        void fillBackgroundInformation(int pdg, double vx, double vy, double vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillSignalInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillBackgroundInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
         void initializeProtonPoints(TGraph *gProton);
         void initializePionPoints(TGraph *gPion);
         double computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints);
@@ -298,7 +298,7 @@ class RecoAllEval : public art::EDAnalyzer {
 
         // Background information
         int backgroundType; 
-        int NUM_BACKGROUND_TYPES = 11;
+        int NUM_BACKGROUND_TYPES = 12;
         // Background types:
         //    0:  0p pion absorption
         //    1:  Np pion absorption
@@ -312,6 +312,7 @@ class RecoAllEval : public art::EDAnalyzer {
         //    9:  capture at rest
         //    10: decay
         //    11: other
+        //    12: elastic scattering
 
         // Truth primary information
         int                      truthPrimaryPDG;
@@ -323,6 +324,11 @@ class RecoAllEval : public art::EDAnalyzer {
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
+
+        // Truth information about interactions in trajectory
+        bool        interactionInTrajectory;
+        std::string trajectoryInteractionLabel;
+        double      trajectoryInteractionAngle;
 
         // If pion inelastic scattered, want more information
         double                   truthScatteringAngle;
@@ -518,6 +524,7 @@ void RecoAllEval::analyze(art::Event const &e) {
     std::vector<int> primaryDaughtersIDs;
     TLorentzVector primaryStart, primaryEnd;
     TLorentzVector vertexMomentum;
+    simb::MCTrajectory primaryTrajectory;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
@@ -530,10 +537,51 @@ void RecoAllEval::analyze(art::Event const &e) {
             vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
             truthPrimaryIncidentKE = part->E() - part->Mass();
             truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - part->Mass();
+            primaryTrajectory      = part->Trajectory();
             break;
         }
     }
 
+    // Look at interactions through primary trajectory
+    auto primaryTrajectoryProcessMap = primaryTrajectory.TrajectoryProcesses();
+    TLorentzVector momBeforeInteraction, momAfterInteraction;
+    if (primaryTrajectory.size()) {
+        for (auto const& couple: primaryTrajectoryProcessMap) {
+            // Each couple is pair of the form (index, process key)
+
+            // We do not concern ourselves with Coulomb scattering
+            if ((primaryTrajectory.KeyToProcess(couple.second)).find("CoulombScat") != std::string::npos) continue;
+
+            // Check position is inside reduced volume
+            auto interactionPosition = (primaryTrajectory.at(couple.first)).first; // .at() returns (pos, mom), we grab pos
+            if (!isWithinReducedVolume(interactionPosition.X(), interactionPosition.Y(), interactionPosition.Z())) continue;
+
+            // If we do not have Coulomb scattering, and the interaction happens in the reduced volume,
+            // we have an interesting interaction, so we want to save the information 
+            interactionInTrajectory = true;
+            trajectoryInteractionLabel = primaryTrajectory.KeyToProcess(couple.second);
+            
+            // Get momentum before and after interaction
+            momBeforeInteraction = (primaryTrajectory.at(couple.first - 1)).second;
+            momAfterInteraction  = (primaryTrajectory.at(couple.first)).second;
+            // if (couple.first + 1 >= primaryTrajectory.size()) {
+            //     momAfterInteraction = momBeforeInteraction;
+            // } else {
+            //     momAfterInteraction  = (primaryTrajectory.at(couple.first + 1)).second;
+            // }
+            // break;
+        }
+    }
+
+    if (interactionInTrajectory) {
+        trajectoryInteractionAngle = momBeforeInteraction.Angle(momAfterInteraction.Vect());
+        if (bVerbose) std::cout << "Interaction found in primary trajectory" << std::endl;
+        if (bVerbose) std::cout << "  Interaction in trajectory: " << trajectoryInteractionLabel << std::endl;
+        if (bVerbose) std::cout << "  Elastic scattering angle: " << trajectoryInteractionAngle << std::endl;
+        if (bVerbose) std::cout << std::endl;
+    }
+
+    // Look at daughters of primary particle
     std::vector<int> secondaryPionDaughtersIDs;
     TLorentzVector scatteredPionStart, scatteredPionEnd;
     TLorentzVector outgoingScatterMomentum;
@@ -565,9 +613,6 @@ void RecoAllEval::analyze(art::Event const &e) {
         }
     }
 
-    TVector3 incomingPrimary(primaryEnd.X() - primaryStart.X(), primaryEnd.Y() - primaryStart.Y(), primaryEnd.Z() - primaryStart.Z());
-    TVector3 scatteredPion(scatteredPionEnd.X() - scatteredPionStart.X(), scatteredPionEnd.Y() - scatteredPionStart.Y(), scatteredPionEnd.Z() - scatteredPionStart.Z());
-    // truthScatteringAngle  = incomingPrimary.Angle(scatteredPion);
     truthScatteringAngle = vertexMomentum.Angle(outgoingScatterMomentum.Vect());
     truthSecondaryVertexX = scatteredPionEnd.X();
     truthSecondaryVertexY = scatteredPionEnd.Y();
@@ -578,6 +623,8 @@ void RecoAllEval::analyze(art::Event const &e) {
         truthPrimaryVertexX,
         truthPrimaryVertexY,
         truthPrimaryVertexZ,
+        interactionInTrajectory,
+        trajectoryInteractionLabel,
         truthPrimaryDaughtersPDG,
         truthPrimaryDaughtersProcess,
         truthPrimaryDaughtersKE
@@ -697,8 +744,9 @@ void RecoAllEval::analyze(art::Event const &e) {
                 for (int iCoord = 0; iCoord < numCoordPoints; ++iCoord) {
                     TVector3 p = thisTrack->LocationAtPoint<TVector3>(iCoord);
                     WC2TPCLocationsX.push_back(p.X()); WC2TPCLocationsY.push_back(p.Y()); WC2TPCLocationsZ.push_back(p.Z());
-                    if (bVerbose) std::cout << "  x: " << p.X() << " y: " << p.Y() << " z: " << p.Z() << std::endl;
+                    // if (bVerbose) std::cout << "  x: " << p.X() << " y: " << p.Y() << " z: " << p.Z() << std::endl;
                 }
+                if (bVerbose) std::cout << std::endl;
 
                 // Get curvature
                 auto [meanCurvature, maxCurvature] = computeCurvature(*thisTrack);
@@ -1183,6 +1231,10 @@ void RecoAllEval::beginJob() {
     RecoAllEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
     RecoAllEvalTree->Branch("primaryEndPointHitX", &primaryEndPointHitX, "primaryEndPointHitX/D");
     RecoAllEvalTree->Branch("primaryEndPointHitW", &primaryEndPointHitW, "primaryEndPointHitW/D");
+
+    RecoAllEvalTree->Branch("interactionInTrajectory", &interactionInTrajectory, "interactionInTrajectory/O");
+    RecoAllEvalTree->Branch("trajectoryInteractionLabel", "std::string", &trajectoryInteractionLabel);
+    RecoAllEvalTree->Branch("trajectoryInteractionAngle", &trajectoryInteractionAngle, "trajectoryInteractionAngle/D");
 }
 
 unsigned int RecoAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1311,6 +1363,8 @@ bool RecoAllEval::isWithinReducedVolume(double x, double y, double z) {
 void RecoAllEval::fillSignalInformation(
     int pdg,
     double vx, double vy, double vz,
+    bool interactionInTrajectory,
+    std::string trajectoryInteractionLabel,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
@@ -1338,6 +1392,9 @@ void RecoAllEval::fillSignalInformation(
         }
     }
 
+    // If we have elastic scattering in trajectory, we do not consider it a signal
+    if (interactionInTrajectory && trajectoryInteractionLabel == "hadElastic") isPionAbsorptionSignalTemp = false;
+
     if (isPionAbsorptionSignalTemp) {
         // Event is signal!
         numVisibleProtons      = tempNumProtons;
@@ -1347,6 +1404,8 @@ void RecoAllEval::fillSignalInformation(
         fillBackgroundInformation(
             pdg,
             vx, vy, vz,
+            interactionInTrajectory,
+            trajectoryInteractionLabel,
             daughtersPDG,
             daughtersProcess,
             daughtersKE
@@ -1358,6 +1417,8 @@ void RecoAllEval::fillSignalInformation(
 void RecoAllEval::fillBackgroundInformation(
     int pdg,
     double vx, double vy, double vz,
+    bool interactionInTrajectory,
+    std::string trajectoryInteractionLabel,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
@@ -1366,9 +1427,16 @@ void RecoAllEval::fillBackgroundInformation(
         if (pdg == 13) { backgroundType = 2; }
         else if (pdg == 11) { backgroundType = 3; }
         else { backgroundType = 4; }
-        return; 
-    } 
+        return;
+    }
 
+    // Check for elastic scattering in trajectory (already checked it's inside reduced volume)
+    if (interactionInTrajectory && trajectoryInteractionLabel == "hadElastic") { backgroundType = 12; return; }
+
+    // If interaction not in reduced volume, flag as outside reduced volume
+    if (!isWithinReducedVolume(vx, vy, vz)) { backgroundType = 5; return; }
+
+    // If interaction is inside reduced volume, check daughters
     int numDaughters = daughtersPDG.size();
     int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
@@ -1394,9 +1462,6 @@ void RecoAllEval::fillBackgroundInformation(
             backgroundType = 8;
         }
     }
-
-    // Only flag as outside reduced volume if it is not anything else
-    if ((backgroundType == -1) && (!isWithinReducedVolume(vx, vy, vz))) { backgroundType = 5; return; }
 
     // If not flagged at this point, label as other
     if (backgroundType == -1) backgroundType = 11;
@@ -1702,6 +1767,10 @@ void RecoAllEval::resetTree() {
     hitWC2TPCKey.clear();
     primaryEndPointHitX = 0.;
     primaryEndPointHitW = 0.;
+
+    interactionInTrajectory    = false;
+    trajectoryInteractionLabel = "";
+    trajectoryInteractionAngle = 0.0;
 }
 
 void RecoAllEval::endJob() {
