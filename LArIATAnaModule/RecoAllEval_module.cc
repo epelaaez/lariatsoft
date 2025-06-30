@@ -7,21 +7,6 @@
 // and RecoAllEval module by Matt King.
 ////////////////////////////////////////////////////////////////////////
 
-// ########################
-// ### LArSoft includes ###
-// ########################
-#include "lardataobj/RecoBase/Track.h"
-#include "lardataobj/RecoBase/SpacePoint.h"
-#include "lardataobj/RecoBase/Hit.h"
-#include "lardataobj/AnalysisBase/BackTrackerMatchingData.h"
-
-// #######################
-// ### LArIAT includes ###
-// #######################
-#include "Utilities/DatabaseUtilityT1034.h"
-#include "LArIATRecoAlg/TriggerFilterAlg.h"
-#include "LArIATDataProducts/WCTrack.h"
-
 // ##########################
 // ### Framework includes ###
 // ##########################
@@ -34,8 +19,8 @@
 #include "art/Framework/Principal/Handle.h"
 #include "art/Framework/Principal/Run.h"
 #include "art/Framework/Principal/SubRun.h"
-//#include "art/Framework/Services/Optional/TFileService.h" 
-//#include "art/Framework/Services/Optional/TFileDirectory.h"
+#include "art/Framework/Core/EDFilter.h"
+#include "art/Framework/Core/ModuleMacros.h"
 #include "art_root_io/TFileService.h"
 #include "art_root_io/TFileDirectory.h"
 #include "art/Framework/Services/Registry/ServiceHandle.h" 
@@ -49,6 +34,8 @@
 // ########################
 // ### LArSoft includes ###
 // ########################
+#include "Utilities/DatabaseUtilityT1034.h"
+#include "LArIATRecoAlg/TriggerFilterAlg.h"
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
 #include "larcoreobj/SimpleTypesAndConstants/RawTypes.h" 
 #include "larcore/Geometry/Geometry.h"
@@ -60,6 +47,7 @@
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/RecoBase/Track.h"
+#include "lardataobj/AnalysisBase/BackTrackerMatchingData.h"
 #include "lardataobj/RecoBase/Vertex.h"
 #include "lardataobj/RecoBase/SpacePoint.h"
 #include "lardata/DetectorInfoServices/LArPropertiesService.h"
@@ -77,69 +65,6 @@
 #include "LArIATDataProducts/WCTrack.h"
 #include "RawDataUtilities/TriggerDigitUtility.h"
 
-#include "art/Framework/Core/EDFilter.h"
-#include "art/Framework/Core/ModuleMacros.h"
-#include "art/Framework/Principal/Event.h"
-#include "art/Framework/Principal/Handle.h"
-#include "art/Framework/Principal/Run.h"
-#include "art/Framework/Principal/SubRun.h"
-#include "LArIATDataProducts/WCTrack.h"
-#include "canvas/Persistency/Common/FindOneP.h" 
-#include "canvas/Persistency/Common/Ptr.h" 
-#include "canvas/Persistency/Common/PtrVector.h"
-#include "cetlib/maybe_ref.h" 
-//#include "art/Utilities/InputTag.h"
-#include "fhiclcpp/ParameterSet.h"
-#include "messagefacility/MessageLogger/MessageLogger.h"
-#include "lardataobj/RecoBase/Track.h"
-#include <memory>
-#include "lardataobj/RecoBase/PFParticle.h"
-#include "larsim/MCCheater/ParticleInventoryService.h"
-
-
-// #####################
-// ### ROOT includes ###
-// #####################
-#include <TH1F.h>
-#include <TF1.h>
-#include <TH2F.h>
-#include <TGraph.h>
-#include <TTree.h>
-#include "TRandom2.h"
-
-// ####################
-// ### C++ includes ###
-// ####################
-#include <map>
-#include <memory>
-#include <fstream>
-#include "math.h"
-#include <algorithm>
-
-// ##########################
-// ### Framework includes ###
-// ##########################
-#include "art/Framework/Core/EDAnalyzer.h"
-#include "art/Framework/Core/ModuleMacros.h" 
-#include "art/Framework/Principal/Event.h" 
-#include "fhiclcpp/ParameterSet.h" 
-#include "art/Framework/Principal/Run.h"
-#include "art/Framework/Principal/SubRun.h"
-#include "art/Framework/Principal/Handle.h" 
-#include "canvas/Persistency/Common/Ptr.h" 
-#include "canvas/Persistency/Common/PtrVector.h" 
-#include "art/Framework/Services/Registry/ServiceHandle.h" 
-#include "canvas/Persistency/Common/FindOneP.h" 
-#include "canvas/Persistency/Common/FindManyP.h"
-#include "messagefacility/MessageLogger/MessageLogger.h" 
-//#include "cetlib/maybe_ref.h"
-
-// ########################
-// ### LArSoft includes ###
-// ########################
-#include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
-#include "larcoreobj/SimpleTypesAndConstants/RawTypes.h" // raw::ChannelID_t
-#include "larcore/Geometry/Geometry.h"
 #include "larcorealg/Geometry/CryostatGeo.h"
 #include "larcorealg/Geometry/TPCGeo.h"
 #include "larcorealg/Geometry/PlaneGeo.h"
@@ -151,42 +76,44 @@
 #include "lardataobj/RecoBase/TrackHitMeta.h"
 #include "lardataobj/RecoBase/Vertex.h"
 #include "lardataobj/RecoBase/SpacePoint.h"
-#include "lardata/ArtDataHelper/TrackUtils.h" // lar::util::TrackPitchInView()
+#include "lardata/ArtDataHelper/TrackUtils.h"
 #include "lardata/DetectorInfoServices/LArPropertiesService.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/Utilities/AssociationUtil.h"
 
-//#include "RawData/ExternalTrigger.h"
-#include "lardataobj/RawData/RawDigit.h"
-#include "lardataobj/RawData/raw.h"
 #include "larsim/MCCheater/BackTrackerService.h"
-#include "larsim/MCCheater/ParticleInventoryService.h"
-#include "lardataobj/Simulation/SimChannel.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
-#include "larevt/Filters/ChannelFilter.h"
-#include "lardataobj/AnalysisBase/Calorimetry.h"
-#include "lardataobj/AnalysisBase/ParticleID.h"
-#include "larreco/RecoAlg/TrackMomentumCalculator.h"
-#include "LArIATDataProducts/WCTrack.h"
-#include "LArIATDataProducts/TOF.h"
-#include "LArIATDataProducts/AGCounter.h"
-#include "RawDataUtilities/TriggerDigitUtility.h"
 #include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/RecoBase/EndPoint2D.h"
 #include "lardataobj/MCBase/MCShower.h"
 #include "lardataobj/MCBase/MCStep.h"
 #include "larreco/Calorimetry/CalorimetryAlg.h"
+#include "lardataobj/RecoBase/PFParticle.h"
+#include "larsim/MCCheater/ParticleInventoryService.h"
 
 // #####################
 // ### ROOT includes ###
 // #####################
+#include <TH1F.h>
+#include <TF1.h>
+#include <TH2F.h>
+#include <TGraph.h>
+#include <TTree.h>
+#include "TRandom2.h"
 #include "TComplex.h"
 #include "TFile.h"
 #include "TH2D.h"
-#include "TF1.h"
-#include "TTree.h"
 #include "TTimeStamp.h"
 #include "TLorentzVector.h"
+
+// ####################
+// ### C++ includes ###
+// ####################
+#include <map>
+#include <memory>
+#include <fstream>
+#include "math.h"
+#include <algorithm>
 
 // Type definitions
 typedef std::map<int, art::Ptr<simb::MCParticle>> ParticleMap;
@@ -332,6 +259,7 @@ class RecoAllEval : public art::EDAnalyzer {
         double      trajectoryInteractionX;
         double      trajectoryInteractionY;
         double      trajectoryInteractionZ;
+        double      trajectoryInteractionKE;
 
         // If pion inelastic scattered, want more information
         double                   truthScatteringAngle;
@@ -469,8 +397,9 @@ class RecoAllEval : public art::EDAnalyzer {
         const double RmaxZ = 82.0;
 
         // Random generator
-        TRandom2* fRand;
         int       fRandSeed = 1989;
+        TRandom2* fRand     = new TRandom2(fRandSeed);
+
 };
 
 RecoAllEval::RecoAllEval(fhicl::ParameterSet const &p) 
@@ -501,9 +430,6 @@ void RecoAllEval::analyze(art::Event const &e) {
     fXTicksOffset[1]  = fDetProp->GetXTicksOffset(1,0,0);
     fSamplingRate     = fDetProp->SamplingRate() * 1e-3;
 
-    // Random number generator
-    fRand = new TRandom2(fRandSeed);
-
     /////////////////
     // Get MC data //
     /////////////////
@@ -528,6 +454,7 @@ void RecoAllEval::analyze(art::Event const &e) {
     TLorentzVector primaryStart, primaryEnd;
     TLorentzVector vertexMomentum;
     simb::MCTrajectory primaryTrajectory;
+    double primaryMass = 0.;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
@@ -538,8 +465,9 @@ void RecoAllEval::analyze(art::Event const &e) {
             truthPrimaryVertexZ    = part->EndZ(); 
             primaryStart           = part->Position(); primaryEnd = part->EndPosition();
             vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
-            truthPrimaryIncidentKE = part->E() - part->Mass();
-            truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - part->Mass();
+            primaryMass            = part->Mass();
+            truthPrimaryIncidentKE = part->E() - primaryMass;
+            truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - primaryMass;
             primaryTrajectory      = part->Trajectory();
             break;
         }
@@ -567,6 +495,8 @@ void RecoAllEval::analyze(art::Event const &e) {
             trajectoryInteractionX = interactionPosition.X();
             trajectoryInteractionY = interactionPosition.Y();
             trajectoryInteractionZ = interactionPosition.Z();
+
+            trajectoryInteractionKE = primaryTrajectory.E(couple.first) - primaryMass;
             
             // Get momentum before and after interaction
             momBeforeInteraction = (primaryTrajectory.at(couple.first - 1)).second;
@@ -1240,6 +1170,7 @@ void RecoAllEval::beginJob() {
     RecoAllEvalTree->Branch("trajectoryInteractionX", &trajectoryInteractionX, "trajectoryInteractionX/D");
     RecoAllEvalTree->Branch("trajectoryInteractionY", &trajectoryInteractionY, "trajectoryInteractionY/D");
     RecoAllEvalTree->Branch("trajectoryInteractionZ", &trajectoryInteractionZ, "trajectoryInteractionZ/D");
+    RecoAllEvalTree->Branch("trajectoryInteractionKE", &trajectoryInteractionKE, "trajectoryInteractionKE/D");
 }
 
 unsigned int RecoAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1776,13 +1707,16 @@ void RecoAllEval::resetTree() {
     interactionInTrajectory    = false;
     trajectoryInteractionLabel = "";
     trajectoryInteractionAngle = 0.0;
-    trajectoryInteractionX = -99999.;
-    trajectoryInteractionY = -99999.;
-    trajectoryInteractionZ = -99999.;
+    trajectoryInteractionX     = -99999.;
+    trajectoryInteractionY     = -99999.;
+    trajectoryInteractionZ     = -99999.;
+    trajectoryInteractionKE    = -99999.;
 }
 
 void RecoAllEval::endJob() {
-    
+    delete gProton;
+    delete gPion;
+    delete fRand;
 }
 
 void RecoAllEval::reconfigure(fhicl::ParameterSet const & p) {
