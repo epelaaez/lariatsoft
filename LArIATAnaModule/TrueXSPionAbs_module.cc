@@ -3,7 +3,7 @@
 // Module Type: analyzer
 // File:        TrueXSPionAbs_module.cc
 //
-// Generated at Tue June 29 11:21:46 2017 by Elena Gramellini
+// Adapted from Elena Gramellini's code by Emilio Pelaez
 ////////////////////////////////////////////////////////////////////////
 
 // ##########################
