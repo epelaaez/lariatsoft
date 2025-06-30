@@ -298,7 +298,7 @@ class RecoAllEval : public art::EDAnalyzer {
 
         // Background information
         int backgroundType; 
-        int NUM_BACKGROUND_TYPES = 12;
+        int NUM_BACKGROUND_TYPES = 13;
         // Background types:
         //    0:  0p pion absorption
         //    1:  Np pion absorption
@@ -329,6 +329,9 @@ class RecoAllEval : public art::EDAnalyzer {
         bool        interactionInTrajectory;
         std::string trajectoryInteractionLabel;
         double      trajectoryInteractionAngle;
+        double      trajectoryInteractionX;
+        double      trajectoryInteractionY;
+        double      trajectoryInteractionZ;
 
         // If pion inelastic scattered, want more information
         double                   truthScatteringAngle;
@@ -560,16 +563,14 @@ void RecoAllEval::analyze(art::Event const &e) {
             // we have an interesting interaction, so we want to save the information 
             interactionInTrajectory = true;
             trajectoryInteractionLabel = primaryTrajectory.KeyToProcess(couple.second);
+
+            trajectoryInteractionX = interactionPosition.X();
+            trajectoryInteractionY = interactionPosition.Y();
+            trajectoryInteractionZ = interactionPosition.Z();
             
             // Get momentum before and after interaction
             momBeforeInteraction = (primaryTrajectory.at(couple.first - 1)).second;
             momAfterInteraction  = (primaryTrajectory.at(couple.first)).second;
-            // if (couple.first + 1 >= primaryTrajectory.size()) {
-            //     momAfterInteraction = momBeforeInteraction;
-            // } else {
-            //     momAfterInteraction  = (primaryTrajectory.at(couple.first + 1)).second;
-            // }
-            // break;
         }
     }
 
@@ -826,7 +827,7 @@ void RecoAllEval::analyze(art::Event const &e) {
 
         // Order track
         double startDistance = distance(thisTrack->Start().X(), WC2TPCPrimaryEndX, thisTrack->Start().Y(), WC2TPCPrimaryEndY, thisTrack->Start().Z(), WC2TPCPrimaryEndZ);             
-        double endDistance = distance(thisTrack->End().X(), WC2TPCPrimaryEndX, thisTrack->End().Y(), WC2TPCPrimaryEndY, thisTrack->End().Z(), WC2TPCPrimaryEndZ);
+        double endDistance   = distance(thisTrack->End().X(), WC2TPCPrimaryEndX, thisTrack->End().Y(), WC2TPCPrimaryEndY, thisTrack->End().Z(), WC2TPCPrimaryEndZ);
 
         if (startDistance < endDistance) {
             recoBeginning = thisTrack->Start();
@@ -1235,6 +1236,10 @@ void RecoAllEval::beginJob() {
     RecoAllEvalTree->Branch("interactionInTrajectory", &interactionInTrajectory, "interactionInTrajectory/O");
     RecoAllEvalTree->Branch("trajectoryInteractionLabel", "std::string", &trajectoryInteractionLabel);
     RecoAllEvalTree->Branch("trajectoryInteractionAngle", &trajectoryInteractionAngle, "trajectoryInteractionAngle/D");
+
+    RecoAllEvalTree->Branch("trajectoryInteractionX", &trajectoryInteractionX, "trajectoryInteractionX/D");
+    RecoAllEvalTree->Branch("trajectoryInteractionY", &trajectoryInteractionY, "trajectoryInteractionY/D");
+    RecoAllEvalTree->Branch("trajectoryInteractionZ", &trajectoryInteractionZ, "trajectoryInteractionZ/D");
 }
 
 unsigned int RecoAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1771,6 +1776,9 @@ void RecoAllEval::resetTree() {
     interactionInTrajectory    = false;
     trajectoryInteractionLabel = "";
     trajectoryInteractionAngle = 0.0;
+    trajectoryInteractionX = -99999.;
+    trajectoryInteractionY = -99999.;
+    trajectoryInteractionZ = -99999.;
 }
 
 void RecoAllEval::endJob() {
