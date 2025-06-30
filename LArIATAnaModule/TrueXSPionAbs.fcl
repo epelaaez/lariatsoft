@@ -25,7 +25,7 @@ physics: {
     analyzers: {
         TrueXSPionAbs: {
             module_type:            "TrueXSPionAbs"
-            Verbose:                true
+            Verbose:                false
             SimulationLabel:        largeant
             ProtonEnergyLowerBound: 0.075
             ProtonEnergyUpperBound: 1.0

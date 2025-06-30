@@ -117,8 +117,8 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
 
         // Helper functions
         void resetTree();
-        void fillSignalInformation(int pdg, double vx, double vy, double vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
-        void fillBackgroundInformation(int pdg, double vx, double vy, double vz, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillSignalInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        void fillBackgroundInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
         bool isWithinReducedVolume(double x, double y, double z);
 
     private:
@@ -142,6 +142,14 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
 
+        // Truth information about interactions in trajectory
+        bool        interactionInTrajectory;
+        std::string trajectoryInteractionLabel;
+        double      trajectoryInteractionAngle;
+        double      trajectoryInteractionX;
+        double      trajectoryInteractionY;
+        double      trajectoryInteractionZ;
+
         // Cross-section signal histograms
         TH1D *hCrossSection;
         TH1D *hCrossSectionEl;
@@ -151,8 +159,8 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         TH1D *hCrossSectionPionAbsNp;
 
         // Cross-section background histograms
-        TH1D *hCrossSectionOutsideRedVolume;
         TH1D *hCrossSectionPionInelastic;
+        TH1D *hCrossSectionPionElastic;
         TH1D *hCrossSectionChargeExchange;
         TH1D *hCrossSectionDoubleChargeExchange;
         TH1D *hCrossSectionCaptureAtRest;
@@ -170,8 +178,8 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         TH1D *hInteractingKEPionAbsNp;
 
         // Kinetic energy background histograms
-        TH1D *hInteractingKEOutsideRedVolume;
         TH1D *hInteractingKEPionInelastic;
+        TH1D *hInteractingKEPionElastic;
         TH1D *hInteractingKEChargeExchange;
         TH1D *hInteractingKEDoubleChargeExchange;
         TH1D *hInteractingKECaptureAtRest;
@@ -294,6 +302,7 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 
     // Identify true-level primary particle and get its information
     std::vector<int> primaryDaughtersIDs;
+    simb::MCTrajectory primaryTrajectory;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
@@ -302,7 +311,37 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             truthPrimaryVertexX    = part->EndX();
             truthPrimaryVertexY    = part->EndY();
             truthPrimaryVertexZ    = part->EndZ();
+            primaryTrajectory      = part->Trajectory();
             break;
+        }
+    }
+
+    // Look at interactions through primary trajectory
+    auto primaryTrajectoryProcessMap = primaryTrajectory.TrajectoryProcesses();
+    TLorentzVector momBeforeInteraction, momAfterInteraction;
+    if (primaryTrajectory.size()) {
+        for (auto const& couple: primaryTrajectoryProcessMap) {
+            // Each couple is pair of the form (index, process key)
+
+            // We do not concern ourselves with Coulomb scattering
+            if ((primaryTrajectory.KeyToProcess(couple.second)).find("CoulombScat") != std::string::npos) continue;
+
+            // Check position is inside reduced volume
+            auto interactionPosition = (primaryTrajectory.at(couple.first)).first; // .at() returns (pos, mom), we grab pos
+            if (!isWithinReducedVolume(interactionPosition.X(), interactionPosition.Y(), interactionPosition.Z())) continue;
+
+            // If we do not have Coulomb scattering, and the interaction happens in the reduced volume,
+            // we have an interesting interaction, so we want to save the information 
+            interactionInTrajectory    = true;
+            trajectoryInteractionLabel = primaryTrajectory.KeyToProcess(couple.second);
+
+            trajectoryInteractionX = interactionPosition.X();
+            trajectoryInteractionY = interactionPosition.Y();
+            trajectoryInteractionZ = interactionPosition.Z();
+            
+            // Get momentum before and after interaction
+            momBeforeInteraction = (primaryTrajectory.at(couple.first - 1)).second;
+            momAfterInteraction  = (primaryTrajectory.at(couple.first)).second;
         }
     }
 
@@ -320,6 +359,8 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         truthPrimaryVertexX,
         truthPrimaryVertexY,
         truthPrimaryVertexZ,
+        interactionInTrajectory,
+        trajectoryInteractionLabel,
         truthPrimaryDaughtersPDG,
         truthPrimaryDaughtersProcess,
         truthPrimaryDaughtersKE
@@ -542,8 +583,6 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         double kineticEnergy = initialKE;
 
         for (auto it = std::next(orderedUniformTrjPts.begin()), old_it = orderedUniformTrjPts.begin(); it != orderedUniformTrjPts.end(); it++, old_it++) {
-	        // if (verbose)  std::cout << it->first<<" : " << (it->second).Z() << std::endl ;
-
 	        auto oldPos        = old_it->second;
 	        auto currentPos    =     it->second;
 	
@@ -553,36 +592,35 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 	        // Calculate the energy deposited in this slice	  
 	        auto old_iter = orderedSimIDE.begin();
 	        double currentDepEnergy = 0.;
-	        for ( auto iter= orderedSimIDE.begin(); iter!= orderedSimIDE.end(); iter++, old_iter++) {
+	        for (auto iter = orderedSimIDE.begin(); iter!= orderedSimIDE.end(); iter++, old_iter++) {
 	            auto currentIde = iter->second;
-	            if ( currentIde.z < oldPos.Z()) continue;
-	            if ( currentIde.z > currentPos.Z()) continue;
+	            if (currentIde.z < oldPos.Z()) continue;
+	            if (currentIde.z > currentPos.Z()) continue;
 	            currentDepEnergy += currentIde.energy;
 	        } // Determing which simIDE is within the current slice
 
-            // avoid overfilling super tiny energy depositions
+            // Avoid overfilling super tiny energy depositions
             if (currentDepEnergy / uniformDist < 0.1 ) continue;
+
             // Calculate the current kinetic energy
             kineticEnergy -= currentDepEnergy;
 
             hdEVsdX->Fill(currentDepEnergy, (currentPos.Z() - oldPos.Z()));
             hdEVsKE->Fill(currentDepEnergy, kineticEnergy);
-            hIncidentKE->Fill(kineticEnergy);
             h_DEUniform->Fill(currentDepEnergy);
             h_DXUniform->Fill(uniformDist);
             h_DEDXUniform->Fill(currentDepEnergy / uniformDist);
+
+            if (isWithinReducedVolume(currentPos.X(), currentPos.Y(), currentPos.Z())) {
+                hIncidentKE->Fill(kineticEnergy);
+            }
         } // Loop on OrderedPoints
 
-        // Fill histogram considering ALL interactions
-        if (interactionLabel.size()) {
-            hInteractingKE->Fill(kineticEnergy);
-        }
-
+        // NOTE: the following two if statements are from Elena's original code
         if (interactionLabel.find("Inelastic") != std::string::npos) {
 	        // std::cout<<"Interaction Label: "<<interactionLabel<<"\n";
 	        hInteractingKEInel->Fill(kineticEnergy);
 	    }
-
         // Fill the Elastic and Total Interacting with the last point
         if (interactionLabel.find("Elastic") != std::string::npos) {
             h_DeltaE->Fill(kineticEnergy - 1000 * ((finTPCPoint->second).E() - mass));
@@ -592,6 +630,10 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             hInteractingKEEl->Fill(KEF);
 	    }
 
+        // Fill histogram considering ALL events inside reduced volume
+        if (backgroundType != 5) {
+            hInteractingKE->Fill(kineticEnergy);
+        }
 
         // Fill pion absorption histograms
         if (isPionAbsorptionSignal) {
@@ -604,9 +646,7 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         }
 
         // Fill background histograms
-        if (backgroundType == 5) {
-            hInteractingKEOutsideRedVolume->Fill(kineticEnergy);
-        } else if (backgroundType == 6) {
+        if (backgroundType == 6) {
             hInteractingKEPionInelastic->Fill(kineticEnergy);
         } else if (backgroundType == 7) {
             hInteractingKEChargeExchange->Fill(kineticEnergy);
@@ -618,6 +658,8 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             hInteractingKEDecay->Fill(kineticEnergy);
         } else if (backgroundType == 11) {
             hInteractingKEOther->Fill(kineticEnergy);
+        } else if (backgroundType == 12) {
+            hInteractingKEPionElastic->Fill(kineticEnergy);
         }
 
         finalKE = kineticEnergy;
@@ -627,7 +669,6 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
 	    } else {
 	        G4Process.push_back(interactionLabel);
 	    }
-      
     } // MC Particle Loop
   
     fTree->Fill();
@@ -666,8 +707,8 @@ void lariat::TrueXSPionAbs::endJob() {
         float crossSectionPionAbsNp = ((hInteractingKEPionAbsNp->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
 
         // Cross-section for background interactions
-        float crossSectionOutsideRedVolume     = ((hInteractingKEOutsideRedVolume->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionPionInelastic        = ((hInteractingKEPionInelastic->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionPionElastic          = ((hInteractingKEPionElastic->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionChargeExchange       = ((hInteractingKEChargeExchange->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionDoubleChargeExchange = ((hInteractingKEDoubleChargeExchange->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionCaptureAtRest        = ((hInteractingKECaptureAtRest->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
@@ -683,8 +724,8 @@ void lariat::TrueXSPionAbs::endJob() {
         hCrossSectionPionAbs0p->SetBinContent(iBin, crossSectionPionAbs0p);
         hCrossSectionPionAbsNp->SetBinContent(iBin, crossSectionPionAbsNp);
 
-        hCrossSectionOutsideRedVolume    ->SetBinContent(iBin, crossSectionOutsideRedVolume);
         hCrossSectionPionInelastic       ->SetBinContent(iBin, crossSectionPionInelastic);
+        hCrossSectionPionElastic         ->SetBinContent(iBin, crossSectionPionElastic);
         hCrossSectionChargeExchange      ->SetBinContent(iBin, crossSectionChargeExchange);
         hCrossSectionDoubleChargeExchange->SetBinContent(iBin, crossSectionDoubleChargeExchange);
         hCrossSectionCaptureAtRest       ->SetBinContent(iBin, crossSectionCaptureAtRest);
@@ -715,11 +756,11 @@ void lariat::TrueXSPionAbs::endJob() {
         float numErrorPionAbsNp = std::pow(hInteractingKEPionAbsNp->GetBinContent(iBin), 0.5);
         float numPionAbsNp      = hInteractingKEPionAbsNp->GetBinContent(iBin);
 
-        float numErrorOutsideRedVolume = std::pow(hInteractingKEOutsideRedVolume->GetBinContent(iBin), 0.5);
-        float numOutsideRedVolume      = hInteractingKEOutsideRedVolume->GetBinContent(iBin);
-
         float numErrorPionInelastic = std::pow(hInteractingKEPionInelastic->GetBinContent(iBin), 0.5);
         float numPionInelastic      = hInteractingKEPionInelastic->GetBinContent(iBin); 
+
+        float numErrorPionElastic = std::pow(hInteractingKEPionElastic->GetBinContent(iBin), 0.5);
+        float numPionElastic      = hInteractingKEPionElastic->GetBinContent(iBin);
 
         float numErrorChargeExchange = std::pow(hInteractingKEChargeExchange->GetBinContent(iBin), 0.5);
         float numChargeExchange      = hInteractingKEChargeExchange->GetBinContent(iBin);
@@ -773,16 +814,16 @@ void lariat::TrueXSPionAbs::endJob() {
             hCrossSectionPionAbsNp->SetBinError(iBin, totalError);
         }
 
-        if (numOutsideRedVolume != 0) {
-            float term1      = numErrorOutsideRedVolume / numOutsideRedVolume;
-            float totalError = (crossSectionOutsideRedVolume) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
-            hCrossSectionOutsideRedVolume->SetBinError(iBin, totalError);
-        }
-
         if (numPionInelastic != 0) {
             float term1      = numErrorPionInelastic / numPionInelastic;
             float totalError = (crossSectionPionInelastic) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
             hCrossSectionPionInelastic->SetBinError(iBin, totalError);
+        }
+
+        if (numPionElastic != 0) {
+            float term1      = numErrorPionElastic / numPionElastic;
+            float totalError = (crossSectionPionElastic) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionPionElastic->SetBinError(iBin, totalError);
         }
 
         if (numChargeExchange != 0) {
@@ -851,13 +892,13 @@ void lariat::TrueXSPionAbs::beginJob() {
     hInteractingKEPionAbs0p = tfs->make<TH1D>("hInteractingKEPionAbs0p", "Pion Absorption 0p Interacting Kinetic Energy [MeV]", 42, -100, 2000);
     hInteractingKEPionAbsNp = tfs->make<TH1D>("hInteractingKEPionAbsNp", "Pion Absorption Np Interacting Kinetic Energy [MeV]", 42, -100, 2000);
 
-    hInteractingKEOutsideRedVolume = tfs->make<TH1D>("hInteractingKEOutsideRedVolume", "Outside Reduced Volume Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEPionInelastic     = tfs->make<TH1D>("hInteractingKEPionInelastic", "Pion Inelastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEChargeExchange      = tfs->make<TH1D>("hInteractingKEChargeExchange", "Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEPionInelastic        = tfs->make<TH1D>("hInteractingKEPionInelastic", "Pion Inelastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEPionElastic          = tfs->make<TH1D>("hInteractingKEPionElastic", "Pion Elastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEChargeExchange       = tfs->make<TH1D>("hInteractingKEChargeExchange", "Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
     hInteractingKEDoubleChargeExchange = tfs->make<TH1D>("hInteractingKEDoubleChargeExchange", "Double Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKECaptureAtRest       = tfs->make<TH1D>("hInteractingKECaptureAtRest", "Capture At Rest Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEDecay               = tfs->make<TH1D>("hInteractingKEDecay", "Decay Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEOther               = tfs->make<TH1D>("hInteractingKEOther", "Other Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKECaptureAtRest        = tfs->make<TH1D>("hInteractingKECaptureAtRest", "Capture At Rest Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEDecay                = tfs->make<TH1D>("hInteractingKEDecay", "Decay Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEOther                = tfs->make<TH1D>("hInteractingKEOther", "Other Interacting Kinetic Energy [MeV]", 42, -100, 2000);
 
     hCrossSection     = tfs->make<TH1D>("hCrossSection"     , "Cross-Section [barn]"             , 42, -100, 2000);
     hCrossSectionEl   = tfs->make<TH1D>("hCrossSectionEl"   , "Elastic Cross-Section [barn]"     , 42, -100, 2000);
@@ -867,13 +908,13 @@ void lariat::TrueXSPionAbs::beginJob() {
     hCrossSectionPionAbs0p = tfs->make<TH1D>("hCrossSectionPionAbs0p", "Pion Absorption 0p Cross-Section [barn]", 42, -100, 2000);
     hCrossSectionPionAbsNp = tfs->make<TH1D>("hCrossSectionPionAbsNp", "Pion Absorption Np Cross-Section [barn]", 42, -100, 2000);
 
-    hCrossSectionOutsideRedVolume    = tfs->make<TH1D>("hCrossSectionOutsideRedVolume", "Outside Reduced Volume Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionPionInelastic       = tfs->make<TH1D>("hCrossSectionPionInelastic", "Pion Inelastic Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionChargeExchange      = tfs->make<TH1D>("hCrossSectionChargeExchange", "Charge Exchange Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionPionInelastic        = tfs->make<TH1D>("hCrossSectionPionInelastic", "Pion Inelastic Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionPionElastic          = tfs->make<TH1D>("hCrossSectionPionElastic", "Pion Elastic Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionChargeExchange       = tfs->make<TH1D>("hCrossSectionChargeExchange", "Charge Exchange Cross-Section [barn]", 42, -100, 2000);
     hCrossSectionDoubleChargeExchange = tfs->make<TH1D>("hCrossSectionDoubleChargeExchange", "Double Charge Exchange Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionCaptureAtRest       = tfs->make<TH1D>("hCrossSectionCaptureAtRest", "Capture At Rest Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionDecay               = tfs->make<TH1D>("hCrossSectionDecay", "Decay Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionOther               = tfs->make<TH1D>("hCrossSectionOther", "Other Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionCaptureAtRest        = tfs->make<TH1D>("hCrossSectionCaptureAtRest", "Capture At Rest Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionDecay                = tfs->make<TH1D>("hCrossSectionDecay", "Decay Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionOther                = tfs->make<TH1D>("hCrossSectionOther", "Other Cross-Section [barn]", 42, -100, 2000);
 
     hXZ    = tfs->make<TH2D>("hXZ"     , "hXZ"    , 110, -100, 10, 200, -100, 100);  
     hYZ    = tfs->make<TH2D>("hYZ"     , "hYZ"    , 110, -100, 10, 200, -100, 100); 
@@ -925,6 +966,13 @@ void lariat::TrueXSPionAbs::resetTree() {
     truthPrimaryDaughtersPDG.clear();
     truthPrimaryDaughtersProcess.clear();
     truthPrimaryDaughtersKE.clear();
+
+    interactionInTrajectory    = false;
+    trajectoryInteractionLabel = "";
+    trajectoryInteractionAngle = 0.0;
+    trajectoryInteractionX = -99999.;
+    trajectoryInteractionY = -99999.;
+    trajectoryInteractionZ = -99999.;
 }
 
 bool lariat::TrueXSPionAbs::isWithinReducedVolume(double x, double y, double z) {
@@ -938,6 +986,8 @@ bool lariat::TrueXSPionAbs::isWithinReducedVolume(double x, double y, double z) 
 void lariat::TrueXSPionAbs::fillSignalInformation(
     int pdg,
     double vx, double vy, double vz,
+    bool interactionInTrajectory,
+    std::string trajectoryInteractionLabel,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
@@ -965,6 +1015,9 @@ void lariat::TrueXSPionAbs::fillSignalInformation(
         }
     }
 
+    // If we have elastic scattering in trajectory, we do not consider it a signal
+    if (interactionInTrajectory && trajectoryInteractionLabel == "hadElastic") isPionAbsorptionSignalTemp = false;
+
     if (isPionAbsorptionSignalTemp) {
         // Event is signal!
         numVisibleProtons      = tempNumProtons;
@@ -974,6 +1027,8 @@ void lariat::TrueXSPionAbs::fillSignalInformation(
         fillBackgroundInformation(
             pdg,
             vx, vy, vz,
+            interactionInTrajectory,
+            trajectoryInteractionLabel,
             daughtersPDG,
             daughtersProcess,
             daughtersKE
@@ -985,6 +1040,8 @@ void lariat::TrueXSPionAbs::fillSignalInformation(
 void lariat::TrueXSPionAbs::fillBackgroundInformation(
     int pdg,
     double vx, double vy, double vz,
+    bool interactionInTrajectory,
+    std::string trajectoryInteractionLabel,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
@@ -993,9 +1050,16 @@ void lariat::TrueXSPionAbs::fillBackgroundInformation(
         if (pdg == 13) { backgroundType = 2; }
         else if (pdg == 11) { backgroundType = 3; }
         else { backgroundType = 4; }
-        return; 
-    } 
+        return;
+    }
 
+    // Check for elastic scattering in trajectory (already checked it's inside reduced volume)
+    if (interactionInTrajectory && trajectoryInteractionLabel == "hadElastic") { backgroundType = 12; return; }
+
+    // If interaction not in reduced volume, flag as outside reduced volume
+    if (!isWithinReducedVolume(vx, vy, vz)) { backgroundType = 5; return; }
+
+    // If interaction is inside reduced volume, check daughters
     int numDaughters = daughtersPDG.size();
     int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
@@ -1021,9 +1085,6 @@ void lariat::TrueXSPionAbs::fillBackgroundInformation(
             backgroundType = 8;
         }
     }
-
-    // Only flag as outside reduced volume if it is not anything else
-    if ((backgroundType == -1) && (!isWithinReducedVolume(vx, vy, vz))) { backgroundType = 5; return; }
 
     // If not flagged at this point, label as other
     if (backgroundType == -1) backgroundType = 11;
