@@ -148,7 +148,7 @@ class RecoAllEval : public art::EDAnalyzer {
         bool isWithinActiveVolume(double x, double y, double z);
         bool isWithinReducedVolume(double x, double y, double z);
         bool isWithinReducedVolume(simb::MCParticle *track);
-        double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed, std::vector<double>& trackDEDX, std::vector<double>& trackResR, std::vector<double>& trackXPos, std::vector<double>& trackYPos, std::vector<double>& trackZPos);
+        double meanDEDX(art::FindManyP<anab::Calorimetry> fmcal, unsigned int trackKey, bool isThisTrackReversed, std::vector<double>& trackDEDX, std::vector<double>& trackResR, std::vector<double>& trackEDep, std::vector<double>& trackXPos, std::vector<double>& trackYPos, std::vector<double>& trackZPos);
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
         double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
         std::tuple<double, double> computeCurvature(recob::Track track);
@@ -254,6 +254,7 @@ class RecoAllEval : public art::EDAnalyzer {
 
         // Truth information about interactions in trajectory
         bool        interactionInTrajectory;
+        double      trajectoryInitialMomentumX;
         std::string trajectoryInteractionLabel;
         double      trajectoryInteractionAngle;
         double      trajectoryInteractionX;
@@ -304,6 +305,7 @@ class RecoAllEval : public art::EDAnalyzer {
         std::vector<int>         wcMatchDaughtersPDG;
         std::vector<std::string> wcMatchDaughtersProcess;
         std::vector<double>      wcMatchResR;
+        std::vector<double>      wcMatchEDep;
         std::vector<double>      wcMatchDEDX;
         std::vector<double>      wcMatchXPos;
         std::vector<double>      wcMatchYPos;
@@ -356,6 +358,7 @@ class RecoAllEval : public art::EDAnalyzer {
         // Calorimetry variables for tracks
         std::vector<std::vector<double>> recoDEDX;
         std::vector<std::vector<double>> recoResR;
+        std::vector<std::vector<double>> recoEDep;
         std::vector<std::vector<double>> recoXPos;
         std::vector<std::vector<double>> recoYPos;
         std::vector<std::vector<double>> recoZPos;
@@ -473,6 +476,11 @@ void RecoAllEval::analyze(art::Event const &e) {
         }
     }
 
+    // Get momentum for energy loss
+    auto firstPrimaryPoint          = primaryTrajectory.begin();
+    auto initialPrimaryTrajMomentum = firstPrimaryPoint->second;
+    trajectoryInitialMomentumX      = 1000 * initialPrimaryTrajMomentum.X();
+
     // Look at interactions through primary trajectory
     auto primaryTrajectoryProcessMap = primaryTrajectory.TrajectoryProcesses();
     TLorentzVector momBeforeInteraction, momAfterInteraction;
@@ -544,7 +552,7 @@ void RecoAllEval::analyze(art::Event const &e) {
         }
     }
 
-    truthScatteringAngle = vertexMomentum.Angle(outgoingScatterMomentum.Vect());
+    truthScatteringAngle  = vertexMomentum.Angle(outgoingScatterMomentum.Vect());
     truthSecondaryVertexX = scatteredPionEnd.X();
     truthSecondaryVertexY = scatteredPionEnd.Y();
     truthSecondaryVertexZ = scatteredPionEnd.Z();
@@ -583,7 +591,7 @@ void RecoAllEval::analyze(art::Event const &e) {
     if (numWCtrks != 1) return; 
 
     // Get wcTrack momentum
-    WCTrackMomentum = wctrack[0]->Momentum() * 0.001; // Mev to GeV
+    WCTrackMomentum = wctrack[0]->Momentum();
     WC3PrimaryX     = wctrack[0]->HitPosition(2,0);
     WC3PrimaryY     = wctrack[0]->HitPosition(2,1);
     WC3PrimaryZ     = wctrack[0]->HitPosition(2,2);
@@ -705,9 +713,9 @@ void RecoAllEval::analyze(art::Event const &e) {
                 WC2TPCPrimaryLength = thisTrack->Length();
 
                 // Get calo data
-                std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
-                double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isPrimaryReversed, thisTrackDEDX, thisTrackResR, thisTrackXPos, thisTrackYPos, thisTrackZPos);
-                wcMatchResR = thisTrackResR; wcMatchDEDX = thisTrackDEDX; wcMatchXPos = thisTrackXPos; wcMatchYPos = thisTrackYPos; wcMatchZPos = thisTrackZPos;
+                std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackEDep; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
+                double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isPrimaryReversed, thisTrackDEDX, thisTrackResR, thisTrackEDep, thisTrackXPos, thisTrackYPos, thisTrackZPos);
+                wcMatchResR = thisTrackResR; wcMatchDEDX = thisTrackDEDX; wcMatchEDep = thisTrackEDep; wcMatchXPos = thisTrackXPos; wcMatchYPos = thisTrackYPos; wcMatchZPos = thisTrackZPos;
 
                 // Check primary track is inside reduced volume
                 if (!(isWithinReducedVolume(WC2TPCPrimaryEndX, WC2TPCPrimaryEndY, WC2TPCPrimaryEndZ))) {
@@ -744,7 +752,7 @@ void RecoAllEval::analyze(art::Event const &e) {
         }
     }
 
-    int numSmallTracks    = 0;
+    int numSmallTracks = 0;
     for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
         auto thisTrack = tracklist.at(trk_idx);
         recob::TrackTrajectory::Point_t recoBeginning;
@@ -777,9 +785,9 @@ void RecoAllEval::analyze(art::Event const &e) {
         if (thisTrackLength < SmallTrackLength) numSmallTracks++;
 
         // Calo data
-        std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
-        double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed, thisTrackDEDX, thisTrackResR, thisTrackXPos, thisTrackYPos, thisTrackZPos);
-        recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoMeanDEDX.push_back(thisMeanDEDX); recoXPos.push_back(thisTrackXPos); recoYPos.push_back(thisTrackYPos); recoZPos.push_back(thisTrackZPos);
+        std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackEDep; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
+        double thisMeanDEDX = meanDEDX(fmcal, thisTrack.key(), isThisTrackReversed, thisTrackDEDX, thisTrackResR, thisTrackEDep, thisTrackXPos, thisTrackYPos, thisTrackZPos);
+        recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoEDep.push_back(thisTrackEDep); recoMeanDEDX.push_back(thisMeanDEDX); recoXPos.push_back(thisTrackXPos); recoYPos.push_back(thisTrackYPos); recoZPos.push_back(thisTrackZPos);
 
         // Get chi^2 values
         int    caloPoints = thisTrackDEDX.size(); 
@@ -1033,6 +1041,7 @@ void RecoAllEval::beginJob() {
     RecoAllEvalTree->Branch("run", &run, "run/I");
     RecoAllEvalTree->Branch("subrun", &subrun, "subrun/I");
     RecoAllEvalTree->Branch("event", &event, "event/I");
+    RecoAllEvalTree->Branch("isData", &isData, "isData/O");
 
     RecoAllEvalTree->Branch("isPionAbsorptionSignal", &isPionAbsorptionSignal, "isPionAbsorptionSignal/O");
     RecoAllEvalTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
@@ -1084,6 +1093,7 @@ void RecoAllEval::beginJob() {
     RecoAllEvalTree->Branch("wcMatchDaughtersPDG", "std::vector<int>", &wcMatchDaughtersPDG);
     RecoAllEvalTree->Branch("wcMatchDaughtersProcess", "std::vector<std::string>", &wcMatchDaughtersProcess);
     RecoAllEvalTree->Branch("wcMatchResR", "std::vector<double>", &wcMatchResR);
+    RecoAllEvalTree->Branch("wcMatchEDep", "std::vector<double>", &wcMatchEDep);
     RecoAllEvalTree->Branch("wcMatchDEDX", "std::vector<double>", &wcMatchDEDX);
     RecoAllEvalTree->Branch("wcMatchXPos", "std::vector<double>", &wcMatchXPos);
     RecoAllEvalTree->Branch("wcMatchYPos", "std::vector<double>", &wcMatchYPos);
@@ -1135,6 +1145,7 @@ void RecoAllEval::beginJob() {
 
     RecoAllEvalTree->Branch("recoDEDX","std::vector<std::vector<double>>",&recoDEDX);
     RecoAllEvalTree->Branch("recoResR","std::vector<std::vector<double>>",&recoResR);
+    RecoAllEvalTree->Branch("recoEDep","std::vector<std::vector<double>>",&recoEDep);
     RecoAllEvalTree->Branch("recoXPos","std::vector<std::vector<double>>",&recoXPos);
     RecoAllEvalTree->Branch("recoYPos","std::vector<std::vector<double>>",&recoYPos);
     RecoAllEvalTree->Branch("recoZPos","std::vector<std::vector<double>>",&recoZPos);
@@ -1171,6 +1182,7 @@ void RecoAllEval::beginJob() {
     RecoAllEvalTree->Branch("trajectoryInteractionY", &trajectoryInteractionY, "trajectoryInteractionY/D");
     RecoAllEvalTree->Branch("trajectoryInteractionZ", &trajectoryInteractionZ, "trajectoryInteractionZ/D");
     RecoAllEvalTree->Branch("trajectoryInteractionKE", &trajectoryInteractionKE, "trajectoryInteractionKE/D");
+    RecoAllEvalTree->Branch("trajectoryInitialMomentumX", &trajectoryInitialMomentumX, "trajectoryInitialMomentumX/D");
 }
 
 unsigned int RecoAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1451,8 +1463,9 @@ double RecoAllEval::meanDEDX(
     bool isThisTrackReversed,
     std::vector<double>& trackDEDX,
     std::vector<double>& trackResR,
+    std::vector<double>& trackEDep,
     std::vector<double>& trackXPos, 
-    std::vector<double>& trackYPos, 
+    std::vector<double>& trackYPos,
     std::vector<double>& trackZPos
 ) {
     // Temporary storage for this reco track
@@ -1494,8 +1507,10 @@ double RecoAllEval::meanDEDX(
 
             if (bVerbose) std::cout << "Filled calorimetry vectors" << std::endl;
             if (isThisTrackReversed) {
+                std::reverse(recoPitch_v.begin(), recoPitch_v.end());
                 std::reverse(recoResR_v.begin(), recoResR_v.end());
                 std::reverse(recoDEDX_v.begin(), recoDEDX_v.end());
+                std::reverse(recoEDep_v.begin(), recoEDep_v.end());
                 std::reverse(recoXPos_v.begin(), recoXPos_v.end());
                 std::reverse(recoYPos_v.begin(), recoYPos_v.end());
                 std::reverse(recoZPos_v.begin(), recoZPos_v.end());
@@ -1512,6 +1527,7 @@ double RecoAllEval::meanDEDX(
 
     trackDEDX = recoDEDX_v;
     trackResR = recoResR_v;
+    trackEDep = recoEDep_v;
     trackXPos = recoXPos_v;
     trackYPos = recoYPos_v;
     trackZPos = recoZPos_v;
@@ -1614,6 +1630,7 @@ void RecoAllEval::resetTree() {
     wcMatchDaughtersProcess.clear();
     wcMatchDEDX.clear();
     wcMatchResR.clear();
+    wcMatchEDep.clear();
     wcMatchXPos.clear();
     wcMatchYPos.clear();
     wcMatchZPos.clear();
@@ -1661,6 +1678,7 @@ void RecoAllEval::resetTree() {
     
     recoDEDX.clear();
     recoResR.clear();
+    recoEDep.clear();
     recoXPos.clear();
     recoYPos.clear();
     recoZPos.clear();
@@ -1711,6 +1729,7 @@ void RecoAllEval::resetTree() {
     trajectoryInteractionY     = -99999.;
     trajectoryInteractionZ     = -99999.;
     trajectoryInteractionKE    = -99999.;
+    trajectoryInitialMomentumX = -99999.;
 }
 
 void RecoAllEval::endJob() {
