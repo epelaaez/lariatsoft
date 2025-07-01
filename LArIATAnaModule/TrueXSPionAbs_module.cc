@@ -552,7 +552,7 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
         const double trackPitch = 0.47;
         // I do have space for at least one extra point, so let's put it there!
         // Calculate how many extra points I need to put between the new first point and the second TrajPoint
-        int nPts = (int) (totLength/trackPitch);
+        int nPts = (int) (totLength / trackPitch);
         for (int iPt = 1; iPt <= nPts; iPt++) {
 	        auto newPoint = positionVector0 + iPt * (trackPitch / totLength) * (positionVector1 - positionVector0);
 	        orderedUniformTrjPts[newPoint.Z()] = newPoint;
@@ -687,7 +687,7 @@ void lariat::TrueXSPionAbs::endJob() {
     float molar_mass     = 39.95; // g / mol
     float g_per_kg       = 1000; 
     float avogadro       = 6.022e+23; // number/mol
-    float number_density = rho*g_per_kg / molar_mass * avogadro;
+    float number_density = rho * g_per_kg / molar_mass * avogadro;
     float slab_width     = 0.0047; // in m
 
     // Calculate the cross section, looping over exiting bins to extract cros-section
