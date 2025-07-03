@@ -878,43 +878,43 @@ void lariat::TrueXSPionAbs::beginJob() {
   
     h_UniformDistances = tfs->make<TH1D>("h_UniformDistances","h_UniformDistances; Distance between uniform points  [cm]",500, 0,5);   
 
-    hInitialPz = tfs->make<TH1D>("hInitialPz"    , "Initial Pz [MeV/c]"    , 42, -100, 2000);
-    hInitialKE = tfs->make<TH1D>("hInitialKE"    , "Initial Kinetic Energy [MeV]"    , 42, -100, 2000);
-    hKEAtTPCFF = tfs->make<TH1D>("hKEAtTPCFF"    , "Kinetic Energy @ TPC FF [MeV]"   , 42, -100, 2000);
+    hInitialPz = tfs->make<TH1D>("hInitialPz"    , "Initial Pz [MeV/c]"    , 12, 0, 600);
+    hInitialKE = tfs->make<TH1D>("hInitialKE"    , "Initial Kinetic Energy [MeV]"    , 12, 0, 600);
+    hKEAtTPCFF = tfs->make<TH1D>("hKEAtTPCFF"    , "Kinetic Energy @ TPC FF [MeV]"   , 12, 0, 600);
 
-    hIncidentKE         = tfs->make<TH1D>("hIncidentKE"   , "Incident Kinetic Energy [MeV]"   , 42, -100, 2000); 
-    hInteractingKE      = tfs->make<TH1D>("hInteractingKE", "Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEEl    = tfs->make<TH1D>("hInteractingKEEl", "Elastic Interacting Kinetic Energy [MeV]", 42, -100, 2000); 
-    hInteractingKEElDep = tfs->make<TH1D>("hInteractingKEElDep", "Dep Elastic Interacting Kinetic Energy [MeV]", 42, -100, 2000); 
-    hInteractingKEInel  = tfs->make<TH1D>("hInteractingKEInel", "Inelastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hIncidentKE         = tfs->make<TH1D>("hIncidentKE"   , "Incident Kinetic Energy [MeV]"   , 12, 0, 600); 
+    hInteractingKE      = tfs->make<TH1D>("hInteractingKE", "Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEEl    = tfs->make<TH1D>("hInteractingKEEl", "Elastic Interacting Kinetic Energy [MeV]", 12, 0, 600); 
+    hInteractingKEElDep = tfs->make<TH1D>("hInteractingKEElDep", "Dep Elastic Interacting Kinetic Energy [MeV]", 12, 0, 600); 
+    hInteractingKEInel  = tfs->make<TH1D>("hInteractingKEInel", "Inelastic Interacting Kinetic Energy [MeV]", 12, 0, 600);
 
-    hInteractingKEPionAbs   = tfs->make<TH1D>("hInteractingKEPionAbs", "Pion Absorption Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEPionAbs0p = tfs->make<TH1D>("hInteractingKEPionAbs0p", "Pion Absorption 0p Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEPionAbsNp = tfs->make<TH1D>("hInteractingKEPionAbsNp", "Pion Absorption Np Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEPionAbs   = tfs->make<TH1D>("hInteractingKEPionAbs", "Pion Absorption Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEPionAbs0p = tfs->make<TH1D>("hInteractingKEPionAbs0p", "Pion Absorption 0p Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEPionAbsNp = tfs->make<TH1D>("hInteractingKEPionAbsNp", "Pion Absorption Np Interacting Kinetic Energy [MeV]", 12, 0, 600);
 
-    hInteractingKEPionInelastic        = tfs->make<TH1D>("hInteractingKEPionInelastic", "Pion Inelastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEPionElastic          = tfs->make<TH1D>("hInteractingKEPionElastic", "Pion Elastic Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEChargeExchange       = tfs->make<TH1D>("hInteractingKEChargeExchange", "Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEDoubleChargeExchange = tfs->make<TH1D>("hInteractingKEDoubleChargeExchange", "Double Charge Exchange Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKECaptureAtRest        = tfs->make<TH1D>("hInteractingKECaptureAtRest", "Capture At Rest Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEDecay                = tfs->make<TH1D>("hInteractingKEDecay", "Decay Interacting Kinetic Energy [MeV]", 42, -100, 2000);
-    hInteractingKEOther                = tfs->make<TH1D>("hInteractingKEOther", "Other Interacting Kinetic Energy [MeV]", 42, -100, 2000);
+    hInteractingKEPionInelastic        = tfs->make<TH1D>("hInteractingKEPionInelastic", "Pion Inelastic Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEPionElastic          = tfs->make<TH1D>("hInteractingKEPionElastic", "Pion Elastic Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEChargeExchange       = tfs->make<TH1D>("hInteractingKEChargeExchange", "Charge Exchange Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEDoubleChargeExchange = tfs->make<TH1D>("hInteractingKEDoubleChargeExchange", "Double Charge Exchange Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKECaptureAtRest        = tfs->make<TH1D>("hInteractingKECaptureAtRest", "Capture At Rest Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEDecay                = tfs->make<TH1D>("hInteractingKEDecay", "Decay Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKEOther                = tfs->make<TH1D>("hInteractingKEOther", "Other Interacting Kinetic Energy [MeV]", 12, 0, 600);
 
-    hCrossSection     = tfs->make<TH1D>("hCrossSection"     , "Cross-Section [barn]"             , 42, -100, 2000);
-    hCrossSectionEl   = tfs->make<TH1D>("hCrossSectionEl"   , "Elastic Cross-Section [barn]"     , 42, -100, 2000);
-    hCrossSectionInel = tfs->make<TH1D>("hCrossSectionInel" , "Inelastic Cross-Section [barn]"   , 42, -100, 2000);
+    hCrossSection     = tfs->make<TH1D>("hCrossSection"     , "Cross-Section [barn]"             , 12, 0, 600);
+    hCrossSectionEl   = tfs->make<TH1D>("hCrossSectionEl"   , "Elastic Cross-Section [barn]"     , 12, 0, 600);
+    hCrossSectionInel = tfs->make<TH1D>("hCrossSectionInel" , "Inelastic Cross-Section [barn]"   , 12, 0, 600);
 
-    hCrossSectionPionAbs   = tfs->make<TH1D>("hCrossSectionPionAbs", "Pion Absorption Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionPionAbs0p = tfs->make<TH1D>("hCrossSectionPionAbs0p", "Pion Absorption 0p Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionPionAbsNp = tfs->make<TH1D>("hCrossSectionPionAbsNp", "Pion Absorption Np Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionPionAbs   = tfs->make<TH1D>("hCrossSectionPionAbs", "Pion Absorption Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionPionAbs0p = tfs->make<TH1D>("hCrossSectionPionAbs0p", "Pion Absorption 0p Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionPionAbsNp = tfs->make<TH1D>("hCrossSectionPionAbsNp", "Pion Absorption Np Cross-Section [barn]", 12, 0, 600);
 
-    hCrossSectionPionInelastic        = tfs->make<TH1D>("hCrossSectionPionInelastic", "Pion Inelastic Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionPionElastic          = tfs->make<TH1D>("hCrossSectionPionElastic", "Pion Elastic Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionChargeExchange       = tfs->make<TH1D>("hCrossSectionChargeExchange", "Charge Exchange Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionDoubleChargeExchange = tfs->make<TH1D>("hCrossSectionDoubleChargeExchange", "Double Charge Exchange Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionCaptureAtRest        = tfs->make<TH1D>("hCrossSectionCaptureAtRest", "Capture At Rest Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionDecay                = tfs->make<TH1D>("hCrossSectionDecay", "Decay Cross-Section [barn]", 42, -100, 2000);
-    hCrossSectionOther                = tfs->make<TH1D>("hCrossSectionOther", "Other Cross-Section [barn]", 42, -100, 2000);
+    hCrossSectionPionInelastic        = tfs->make<TH1D>("hCrossSectionPionInelastic", "Pion Inelastic Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionPionElastic          = tfs->make<TH1D>("hCrossSectionPionElastic", "Pion Elastic Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionChargeExchange       = tfs->make<TH1D>("hCrossSectionChargeExchange", "Charge Exchange Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionDoubleChargeExchange = tfs->make<TH1D>("hCrossSectionDoubleChargeExchange", "Double Charge Exchange Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionCaptureAtRest        = tfs->make<TH1D>("hCrossSectionCaptureAtRest", "Capture At Rest Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionDecay                = tfs->make<TH1D>("hCrossSectionDecay", "Decay Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionOther                = tfs->make<TH1D>("hCrossSectionOther", "Other Cross-Section [barn]", 12, 0, 600);
 
     hXZ    = tfs->make<TH2D>("hXZ"     , "hXZ"    , 110, -100, 10, 200, -100, 100);  
     hYZ    = tfs->make<TH2D>("hYZ"     , "hYZ"    , 110, -100, 10, 200, -100, 100); 
