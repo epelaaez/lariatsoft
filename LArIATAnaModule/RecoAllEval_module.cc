@@ -796,7 +796,7 @@ void RecoAllEval::analyze(art::Event const &e) {
         recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoEDep.push_back(thisTrackEDep); recoMeanDEDX.push_back(thisMeanDEDX); recoXPos.push_back(thisTrackXPos); recoYPos.push_back(thisTrackYPos); recoZPos.push_back(thisTrackZPos);
 
         // Get chi^2 values
-        if (bVerbose) std::cout << "Computing chi^2 values: " << thisTrack->ID() << std::endl;
+        if (bVerbose) std::cout << "Computing chi^2 values: " << std::endl;
         int    caloPoints = thisTrackDEDX.size(); 
         double protonChi2 = computeReducedChi2(gProton, thisTrackResR, thisTrackDEDX, caloPoints);
         double pionChi2   = computeReducedChi2(gPion, thisTrackResR, thisTrackDEDX, caloPoints);
@@ -832,13 +832,7 @@ void RecoAllEval::analyze(art::Event const &e) {
             recoTaggedAs.push_back(-1);
         }
 
-        // Fill info about truth-matched particle
-
-        // Get MCParticle objects and metadata
-        if (bVerbose) std::cout << "Filling truth data: " << std::endl;
-        std::vector<art::Ptr<simb::MCParticle>> const& particles = find_many_mcparticles_from_tracks.at(trk_idx);
-        std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
-
+        // Fill reco-level data
         isTrackInverted.push_back(isThisTrackReversed);
         isTrackNearVertex.push_back(thisTrackNearVertex);
         recoBeginX.push_back(recoBeginning.X());
@@ -851,8 +845,16 @@ void RecoAllEval::analyze(art::Event const &e) {
         recoPionChi2.push_back(pionChi2);
         recoProtonChi2.push_back(protonChi2);
 
+        // Fill info about truth-matched particle
+
+        // Get MCParticle objects and metadata
+        if (bVerbose) std::cout << "Filling truth data" << std::endl;
+        std::vector<art::Ptr<simb::MCParticle>> const& particles               = find_many_mcparticles_from_tracks.at(trk_idx);
+        std::vector<const anab::BackTrackerMatchingData*> const& btdata_vector = find_many_mcparticles_from_tracks.data(trk_idx);
+
         // If reco track is not matched to anything, add dummy values
-        if (btdata_vector.size() == 0) {
+        if (btdata_vector.size() == 0 || particles.size() == 0) {
+            if (bVerbose) std::cout << "No truth match " << std::endl;
             matchedIdentity.push_back(-99999);
             matchedCleanliness.push_back(-99999);
             matchedCompleteness.push_back(-99999);
@@ -877,6 +879,7 @@ void RecoAllEval::analyze(art::Event const &e) {
             matchedEndingPy.push_back(-99999);
             matchedEndingPz.push_back(-99999);
         } else {
+            if (bVerbose) std::cout << "Found truth match " << std::endl;
             // Get MCParticle object and data
             auto const& particle = particles.front();
             int const pdg_code   = particle->PdgCode();
@@ -887,6 +890,7 @@ void RecoAllEval::analyze(art::Event const &e) {
             double const completeness = btdata_vector.front()->completeness;
 
             auto partTrackBegin = firstPointInTPC(particle);
+            if (partTrackBegin == 9999) partTrackBegin = 0;
             auto partTrackEnd   = lastPointInTPC(particle);
             auto bestEnd        = std::min(partTrackEnd, particle->NumberTrajectoryPoints() - 2);
 
@@ -894,13 +898,13 @@ void RecoAllEval::analyze(art::Event const &e) {
             matchedBeginX.push_back(particle->Vx(partTrackBegin));
             matchedBeginY.push_back(particle->Vy(partTrackBegin));
             matchedBeginZ.push_back(particle->Vz(partTrackBegin));
-            matchedEndX.push_back(particle->Vx(partTrackEnd));
-            matchedEndY.push_back(particle->Vy(partTrackEnd));
-            matchedEndZ.push_back(particle->Vz(partTrackEnd));
-            matchedRealEndX.push_back(particle->Vx(particle->NumberTrajectoryPoints()));
-            matchedRealEndY.push_back(particle->Vy(particle->NumberTrajectoryPoints()));
-            matchedRealEndZ.push_back(particle->Vz(particle->NumberTrajectoryPoints()));
-            matchedLength.push_back(trackMagnitude(particle, partTrackBegin, partTrackEnd));
+            matchedEndX.push_back(particle->Vx(bestEnd));
+            matchedEndY.push_back(particle->Vy(bestEnd));
+            matchedEndZ.push_back(particle->Vz(bestEnd));
+            matchedRealEndX.push_back(particle->Vx(particle->NumberTrajectoryPoints() - 1));
+            matchedRealEndY.push_back(particle->Vy(particle->NumberTrajectoryPoints() - 1));
+            matchedRealEndZ.push_back(particle->Vz(particle->NumberTrajectoryPoints() - 1));
+            matchedLength.push_back(trackMagnitude(particle, partTrackBegin, bestEnd));
             matchedCompleteness.push_back(completeness);
             matchedCleanliness.push_back(cleanliness);
             matchedTrkID.push_back(g4_trk_id);
@@ -1493,7 +1497,6 @@ double RecoAllEval::meanDEDX(
 
         // Loop over calo data
         for (size_t j = 0; j < calos.size(); ++j) {
-            std::cout << "here? " << std::endl;
             if (!calos[j]->PlaneID().isValid) continue;
             if (calos[j]->PlaneID().Plane == 0) continue; // Induction plane
 
