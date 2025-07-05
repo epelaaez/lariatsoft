@@ -16,7 +16,7 @@ services.scheduler.SkipEvent: [ ProductNotFound ]
 
 source: {
     module_type: RootInput
-    maxEvents: -1
+    maxEvents:   -1
 }
 
 # Define and configure some modules to do work on each event.
@@ -52,13 +52,13 @@ physics: {
     reco: [ recotrackmcmatching ]
     ana: [ RecoAllEval ]
 
-    stream1: [ out1 ]
+    stream1: [ ]
 
     #end_paths is a keyword and contains the paths that do not modify the art::Event, 
     #ie analyzers and output streams.  these all run simultaneously
     
     trigger_paths: [ reco ]
-    end_paths:     [ ana , stream1 ]  
+    end_paths:     [ ana, stream1 ]  
 }
 
 outputs: {
