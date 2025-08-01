@@ -115,9 +115,6 @@
 #include "math.h"
 #include <algorithm>
 
-// Type definitions
-typedef std::map<int, art::Ptr<simb::MCParticle>> ParticleMap;
-
 class RecoAllEval : public art::EDAnalyzer {
     public: 
         explicit RecoAllEval(fhicl::ParameterSet const &p);
@@ -443,12 +440,6 @@ void RecoAllEval::analyze(art::Event const &e) {
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     const sim::ParticleList& plist = pi_serv->ParticleList();
 
-    // Initialize particle map (typedef at top) and fill it
-    ParticleMap particle_map;
-    for (auto const& particle : particle_vector) {
-        particle_map[particle->TrackId()] = particle;
-    }
-
     // Identify true-level primary particle and get its information
     std::vector<int> primaryDaughtersIDs;
     TLorentzVector primaryStart, primaryEnd;
@@ -480,7 +471,7 @@ void RecoAllEval::analyze(art::Event const &e) {
         auto firstPrimaryPoint          = primaryTrajectory.begin();
         auto initialPrimaryTrajMomentum = firstPrimaryPoint->second;
         trajectoryInitialMomentumX      = 1000 * initialPrimaryTrajMomentum.X();
-    } 
+    }
 
     // Look at interactions through primary trajectory
     auto primaryTrajectoryProcessMap = primaryTrajectory.TrajectoryProcesses();

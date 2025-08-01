@@ -58,7 +58,7 @@ physics.filters.ShowerFilt.RemoveOrSelect: true # selects things above the thres
 
 physics.filters.ShowerFilt.NNetModuleLabel: "emtrkmichelid:emtrkmichel:EmTrackId"
 physics.filters.ShowerFilt.HitModuleLabel: "gaushit"
-physics.filters.ShowerFilt.TrackModuleLabel: "pmtracktc"
+physics.filters.ShowerFilt.TrackModuleLabel: "pmtrack"
 physics.filters.ShowerFilt.WCTrackLabel: "wctrack"
 
 physics.filters.ShowerFilt.Data: false

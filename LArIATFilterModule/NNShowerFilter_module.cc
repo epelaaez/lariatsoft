@@ -450,16 +450,14 @@ bool NNShowerFilter::filter(art::Event & e)
   if(bVerbose) { std::cout << "shower prob = " << total_shower_prob << std::endl; }
 
   if(total_shower_prob < fShowerThresh) {
-    fPassingEvents->Fill(6); // My new EM cut 
+    fPassingEvents->Fill(6); // My new EM cut
     fPassingEventsVsPz->Fill(6, momo);
-  }  
+  }
 
   // ifbRemoveOrSelect == true, Select things above the threshold
   // else, Remove things above the threshold
   if(bRemoveOrSelect) { return (total_shower_prob > fShowerThresh); }
   else { return (total_shower_prob < fShowerThresh); }
-
-
 }
 
 void NNShowerFilter::beginJob()
