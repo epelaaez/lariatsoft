@@ -167,6 +167,11 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         TH1D *hCrossSectionDecay;
         TH1D *hCrossSectionOther;
 
+        // Cross-section for scattering signal
+        TH1D* hCrossSectionScattering;
+        TH1D* hCrossSection0pScattering;
+        TH1D* hCrossSectionNpScattering;
+
         // Kinetic energy signal histograms
         TH1D *hIncidentKE;
         TH1D *hInteractingKE; 
@@ -185,6 +190,11 @@ class lariat::TrueXSPionAbs : public art::EDAnalyzer {
         TH1D *hInteractingKECaptureAtRest;
         TH1D *hInteractingKEDecay;
         TH1D *hInteractingKEOther;
+
+        // Kinetic energy for scattering signal
+        TH1D* hInteractingKEScattering;
+        TH1D* hInteractingKE0pScattering;
+        TH1D* hInteractingKENpScattering;
 
         TH1D*   h_DE   ;
         TH1D*   h_DX   ;
@@ -645,6 +655,17 @@ void lariat::TrueXSPionAbs::analyze(art::Event const & evt) {
             }
         }
 
+        // Fill scattering histograms
+        if (backgroundType == 6 || backgroundType == 12) {
+            hInteractingKEScattering->Fill(kineticEnergy);
+            if (backgroundType == 12 || (backgroundType == 6 && numVisibleProtons == 0)) {
+                hInteractingKE0pScattering->Fill(kineticEnergy);
+            }
+            else if (backgroundType == 6 && numVisibleProtons > 0) {
+                hInteractingKENpScattering->Fill(kineticEnergy);
+            }
+        }
+
         // Fill background histograms
         if (backgroundType == 6) {
             hInteractingKEPionInelastic->Fill(kineticEnergy);
@@ -715,6 +736,11 @@ void lariat::TrueXSPionAbs::endJob() {
         float crossSectionDecay                = ((hInteractingKEDecay->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
         float crossSectionOther                = ((hInteractingKEOther->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
 
+        // Cross-section for scattering signal
+        float crossSectionScattering   = ((hInteractingKEScattering->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSection0pScattering = ((hInteractingKE0pScattering->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+        float crossSectionNpScattering = ((hInteractingKENpScattering->GetBinContent(iBin) / hIncidentKE->GetBinContent(iBin)) * (1 / number_density) * (1 / slab_width)) * (1 / 1e-28);
+
         // Putting the value on the histogram
         hCrossSection    ->SetBinContent(iBin, crossSection);
         hCrossSectionEl  ->SetBinContent(iBin, elCrossSection);
@@ -731,6 +757,10 @@ void lariat::TrueXSPionAbs::endJob() {
         hCrossSectionCaptureAtRest       ->SetBinContent(iBin, crossSectionCaptureAtRest);
         hCrossSectionDecay               ->SetBinContent(iBin, crossSectionDecay);
         hCrossSectionOther               ->SetBinContent(iBin, crossSectionOther);
+
+        hCrossSectionScattering  ->SetBinContent(iBin, crossSectionScattering);
+        hCrossSection0pScattering->SetBinContent(iBin, crossSection0pScattering);
+        hCrossSectionNpScattering->SetBinContent(iBin, crossSectionNpScattering);
 
         // Calculating the error on the numerator of the ratio
         float denomError = std::pow(hIncidentKE->GetBinContent(iBin), 0.5);
@@ -776,6 +806,15 @@ void lariat::TrueXSPionAbs::endJob() {
 
         float numErrorOther = std::pow(hInteractingKEOther->GetBinContent(iBin), 0.5);
         float numOther      = hInteractingKEOther->GetBinContent(iBin);
+
+        float numErrorScattering = std::pow(hInteractingKEScattering->GetBinContent(iBin), 0.5);
+        float numScattering      = hInteractingKEScattering->GetBinContent(iBin);
+
+        float numError0pScattering = std::pow(hInteractingKE0pScattering->GetBinContent(iBin), 0.5);
+        float num0pScattering      = hInteractingKE0pScattering->GetBinContent(iBin);
+
+        float numErrorNpScattering = std::pow(hInteractingKENpScattering->GetBinContent(iBin), 0.5);
+        float numNpScattering      = hInteractingKENpScattering->GetBinContent(iBin);
 
         // Putting in a protection against dividing by zero 
         if (num != 0) {
@@ -855,6 +894,24 @@ void lariat::TrueXSPionAbs::endJob() {
             float totalError = (crossSectionOther) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
             hCrossSectionOther->SetBinError(iBin, totalError);
         }
+
+        if (numScattering != 0) {
+            float term1      = numErrorScattering / numScattering;
+            float totalError = (crossSectionScattering) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionScattering->SetBinError(iBin, totalError);
+        }
+
+        if (num0pScattering != 0) {
+            float term1      = numError0pScattering / num0pScattering;
+            float totalError = (crossSection0pScattering) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSection0pScattering->SetBinError(iBin, totalError);
+        }
+
+        if (numNpScattering != 0) {
+            float term1      = numErrorNpScattering / numNpScattering;
+            float totalError = (crossSectionNpScattering) * (std::pow(((term1 * term1) + (term2 * term2)), 0.5)) * (1 / number_density) * (1 / slab_width) * (1e26);
+            hCrossSectionNpScattering->SetBinError(iBin, totalError);
+        }
     } // End bin loop
 }
 
@@ -900,6 +957,10 @@ void lariat::TrueXSPionAbs::beginJob() {
     hInteractingKEDecay                = tfs->make<TH1D>("hInteractingKEDecay", "Decay Interacting Kinetic Energy [MeV]", 12, 0, 600);
     hInteractingKEOther                = tfs->make<TH1D>("hInteractingKEOther", "Other Interacting Kinetic Energy [MeV]", 12, 0, 600);
 
+    hInteractingKEScattering   = tfs->make<TH1D>("hInteractingKEScattering", "Scattering Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKE0pScattering = tfs->make<TH1D>("hInteractingKE0pScattering", "0p Scattering Interacting Kinetic Energy [MeV]", 12, 0, 600);
+    hInteractingKENpScattering = tfs->make<TH1D>("hInteractingKENpScattering", "Np Scattering Interacting Kinetic Energy [MeV]", 12, 0, 600);
+
     hCrossSection     = tfs->make<TH1D>("hCrossSection"     , "Cross-Section [barn]"             , 12, 0, 600);
     hCrossSectionEl   = tfs->make<TH1D>("hCrossSectionEl"   , "Elastic Cross-Section [barn]"     , 12, 0, 600);
     hCrossSectionInel = tfs->make<TH1D>("hCrossSectionInel" , "Inelastic Cross-Section [barn]"   , 12, 0, 600);
@@ -915,6 +976,10 @@ void lariat::TrueXSPionAbs::beginJob() {
     hCrossSectionCaptureAtRest        = tfs->make<TH1D>("hCrossSectionCaptureAtRest", "Capture At Rest Cross-Section [barn]", 12, 0, 600);
     hCrossSectionDecay                = tfs->make<TH1D>("hCrossSectionDecay", "Decay Cross-Section [barn]", 12, 0, 600);
     hCrossSectionOther                = tfs->make<TH1D>("hCrossSectionOther", "Other Cross-Section [barn]", 12, 0, 600);
+
+    hCrossSectionScattering   = tfs->make<TH1D>("hCrossSectionScattering", "Scattering Cross-Section [barn]", 12, 0, 600);
+    hCrossSection0pScattering = tfs->make<TH1D>("hCrossSection0pScattering", "0p Scattering Cross-Section [barn]", 12, 0, 600);
+    hCrossSectionNpScattering = tfs->make<TH1D>("hCrossSectionNpScattering", "Np Scattering Cross-Section [barn]", 12, 0, 600);
 
     hXZ    = tfs->make<TH2D>("hXZ"     , "hXZ"    , 110, -100, 10, 200, -100, 100);  
     hYZ    = tfs->make<TH2D>("hYZ"     , "hYZ"    , 110, -100, 10, 200, -100, 100); 
@@ -998,20 +1063,20 @@ void lariat::TrueXSPionAbs::fillSignalInformation(
     if (!isWithinReducedVolume(vx, vy, vz)) isPionAbsorptionSignalTemp = false;
 
     int numDaughters = daughtersPDG.size();
-    int tempNumProtons = 0;
+    numVisibleProtons = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
-        if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
-        if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) isPionAbsorptionSignalTemp = false;
-        if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) isPionAbsorptionSignalTemp = false;
-
-        if (daughtersProcess[iDaughter] == "pi-Inelastic") {
-            if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { isPionAbsorptionSignalTemp = false; } // muon
-            else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { isPionAbsorptionSignalTemp = false; } // kaon
-            else if (daughtersPDG[iDaughter] == 2212) {
-                if ((daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND) && (daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND)) {
-                    tempNumProtons++;
-                }
-            }
+        if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) { continue; }
+        else if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) { isPionAbsorptionSignalTemp = false; }
+        else if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { isPionAbsorptionSignalTemp = false; } // muon
+        else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { isPionAbsorptionSignalTemp = false; } // kaon 
+        else if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) { isPionAbsorptionSignalTemp = false; }
+        else if (
+            daughtersProcess[iDaughter] == "pi-Inelastic" &&
+            daughtersPDG[iDaughter] == 2212 &&
+            daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND &&
+            daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND
+        ) {
+            numVisibleProtons++;
         }
     }
 
@@ -1020,7 +1085,6 @@ void lariat::TrueXSPionAbs::fillSignalInformation(
 
     if (isPionAbsorptionSignalTemp) {
         // Event is signal!
-        numVisibleProtons      = tempNumProtons;
         isPionAbsorptionSignal = true;
     } else {
         // Event is background, classify it

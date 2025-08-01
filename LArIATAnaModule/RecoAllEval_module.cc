@@ -1337,20 +1337,20 @@ void RecoAllEval::fillSignalInformation(
     if (!isWithinReducedVolume(vx, vy, vz)) isPionAbsorptionSignalTemp = false;
 
     int numDaughters = daughtersPDG.size();
-    int tempNumProtons = 0;
+    numVisibleProtons = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
-        if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) continue;
-        if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) isPionAbsorptionSignalTemp = false;
-        if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) isPionAbsorptionSignalTemp = false;
-
-        if (daughtersProcess[iDaughter] == "pi-Inelastic") {
-            if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { isPionAbsorptionSignalTemp = false; } // muon
-            else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { isPionAbsorptionSignalTemp = false; } // kaon
-            else if (daughtersPDG[iDaughter] == 2212) {
-                if ((daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND) && (daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND)) {
-                    tempNumProtons++;
-                }
-            }
+        if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) { continue; }
+        else if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) { isPionAbsorptionSignalTemp = false; }
+        else if ((daughtersPDG[iDaughter] == 13) || (daughtersPDG[iDaughter] == -13)) { isPionAbsorptionSignalTemp = false; } // muon
+        else if ((daughtersPDG[iDaughter] == 321) || (daughtersPDG[iDaughter] == -321) || (daughtersPDG[iDaughter] == 311)) { isPionAbsorptionSignalTemp = false; } // kaon
+        else if ((daughtersProcess[iDaughter] == "Decay") || (daughtersProcess[iDaughter] == "hBertiniCaptureAtRest")) { isPionAbsorptionSignalTemp = false; }
+        else if (
+            daughtersProcess[iDaughter] == "pi-Inelastic" &&
+            daughtersPDG[iDaughter] == 2212 &&
+            daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND &&
+            daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND
+        ) {
+            numVisibleProtons++;
         }
     }
 
@@ -1359,7 +1359,6 @@ void RecoAllEval::fillSignalInformation(
 
     if (isPionAbsorptionSignalTemp) {
         // Event is signal!
-        numVisibleProtons      = tempNumProtons;
         isPionAbsorptionSignal = true;
     } else {
         // Event is background, classify it
