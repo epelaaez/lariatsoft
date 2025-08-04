@@ -274,7 +274,7 @@ void NNBeamlineShower::analyze(art::Event const &e) {
     if(e.getByLabel(fTrackModuleLabel, TrackHandle)) art::fill_ptr_vector(Tracklist, TrackHandle);
     // Association between Tracks and 2d Hits
     art::FindManyP<recob::Track> ass_trk_hits(HitHandle, e, fTrackModuleLabel); 
-    art::FindManyP<recob::Hit> HitsInTrackAssn(TrackHandle, e, fTrackModuleLabel); 
+    art::FindManyP<recob::Hit> HitsInTrackAssn(TrackHandle, e, fTrackModuleLabel);
 
 
     // Get some basic histograms of what is going onss
@@ -396,7 +396,7 @@ void NNBeamlineShower::analyze(art::Event const &e) {
 
     // First, find closest track to the projected WC track
     double closest_track_index = 0;
-    double closest_dist=99999;
+    double closest_dist = 99999;
     int nMatched = 0.0;
 
     for(size_t i = 0; i < Tracklist.size(); i++) {
@@ -480,7 +480,7 @@ void NNBeamlineShower::analyze(art::Event const &e) {
     if(!HitsInTrackAssn.isValid()) { fRejectionModes->Fill(3.0); NNShowerTree->Fill(); return; }
 
     int lowest_hit = -1;
-    std::vector<art::Ptr<recob::Hit> > trackhits = HitsInTrackAssn.at(closest_track_index);
+    std::vector<art::Ptr<recob::Hit>> trackhits = HitsInTrackAssn.at(closest_track_index);
     for (size_t iHit =0 ; iHit < trackhits.size(); ++iHit) {
         if(trackhits[iHit]->View() != 1) { continue; }        
         if(lowest_hit == -1) { lowest_hit = iHit; }             
