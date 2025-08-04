@@ -245,6 +245,9 @@ class RecoNNAllEval : public art::EDAnalyzer {
         double showerProb;
         bool   obtainedProbabilities;
 
+        double showerNoBoxProb;
+        bool   obtainedNoBoxProbabilities;
+
         // Truth primary information
         int                      truthPrimaryPDG;
         double                   truthPrimaryVertexX;
@@ -780,6 +783,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     double total_shower_prob = 0.0;
     int num_hits = 0;
 
+    double total_shower_prob_no_box = 0.0;
+    int num_hits_no_box = 0;
+
     if (HitsInTrack.isValid() && WC2TPCtrackIndex != -1 && WC2TPCtrkID != -99999) {
         int lowest_hit = -1;
         std::vector<art::Ptr<recob::Hit>> trackhits = HitsInTrack.at(WC2TPCtrackIndex);
@@ -815,7 +821,25 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 showerProb = total_shower_prob;
                 trackProb  = 1. - showerProb;
                 obtainedProbabilities = true;
+            } 
+
+            for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
+                if (fHitlist[iHit]->WireID().Plane != 1) continue;
+                
+                int wireID  = fHitlist[iHit]->WireID().Wire;
+                int hitTime = fHitlist[iHit]->PeakTime();
+
+                if (hitTime > 3000.) continue;
+                if (wireID > 240.) continue;
+
+                // Get NN output
+                total_shower_prob_no_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
+                num_hits_no_box++;
             }
+            total_shower_prob_no_box /= double(num_hits_no_box);
+
+            showerNoBoxProb = total_shower_prob_no_box;
+            obtainedNoBoxProbabilities = true;
         }
     }
 
@@ -1125,6 +1149,9 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("trackProb", &trackProb, "trackProb/D");
     RecoNNAllEvalTree->Branch("showerProb", &showerProb, "showerProb/D");
     RecoNNAllEvalTree->Branch("obtainedProbabilities", &obtainedProbabilities, "obtainedProbabilities/O");
+
+    RecoNNAllEvalTree->Branch("showerNoBoxProb", &showerNoBoxProb, "showerNoBoxProb/D");
+    RecoNNAllEvalTree->Branch("obtainedNoBoxProbabilities", &obtainedNoBoxProbabilities, "obtainedNoBoxProbabilities/O");
 
     RecoNNAllEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
     RecoNNAllEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
@@ -1703,6 +1730,9 @@ void RecoNNAllEval::resetTree() {
     trackProb             = 1.;
     showerProb            = 0.;
     obtainedProbabilities = false;
+
+    showerNoBoxProb = 0.;
+    obtainedNoBoxProbabilities = false;
 
     WC2TPCtrkID = -99999;
 
