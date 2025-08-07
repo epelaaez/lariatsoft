@@ -248,6 +248,9 @@ class RecoNNAllEval : public art::EDAnalyzer {
         double showerNoBoxProb;
         bool   obtainedNoBoxProbabilities;
 
+        double showerOutsideBoxProb;
+        bool   obtainedOutsideBoxProbabilities;
+
         // Truth primary information
         int                      truthPrimaryPDG;
         double                   truthPrimaryVertexX;
@@ -786,6 +789,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     double total_shower_prob_no_box = 0.0;
     int num_hits_no_box = 0;
 
+    double total_shower_prob_outside_box = 0.0;
+    int num_hits_outside_box = 0;
+
     if (HitsInTrack.isValid() && WC2TPCtrackIndex != -1 && WC2TPCtrkID != -99999) {
         int lowest_hit = -1;
         std::vector<art::Ptr<recob::Hit>> trackhits = HitsInTrack.at(WC2TPCtrackIndex);
@@ -794,6 +800,21 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             if (lowest_hit == -1) lowest_hit = iHit;
             if (trackhits[iHit]->WireID().Wire < trackhits[lowest_hit]->WireID().Wire) lowest_hit = iHit;
         }
+
+        for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
+            if (fHitlist[iHit]->WireID().Plane != 1) continue;
+            
+            int wireID  = fHitlist[iHit]->WireID().Wire;
+            int hitTime = fHitlist[iHit]->PeakTime();
+
+            // Get NN output
+            total_shower_prob_no_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
+            num_hits_no_box++;
+        }
+        total_shower_prob_no_box /= double(num_hits_no_box);
+
+        showerNoBoxProb = total_shower_prob_no_box;
+        obtainedNoBoxProbabilities = true;
 
         if (lowest_hit != -1) {
             double inter  = trackhits[lowest_hit]->PeakTime();
@@ -806,8 +827,16 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                     int wireID  = fHitlist[iHit]->WireID().Wire;
                     int hitTime = fHitlist[iHit]->PeakTime();
                     
-                    if(wireID > (offset + 100.0) || wireID < offset) continue;
-                    if(hitTime > inter + 200. || hitTime < inter - 200.) continue;
+                    if(
+                        wireID > (offset + 100.0) || 
+                        wireID < offset ||
+                        hitTime > (inter + 200.0) || 
+                        hitTime < (inter - 200.0)
+                    ) {
+                        total_shower_prob_outside_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]);
+                        num_hits_outside_box++;
+                        continue;
+                    }
 
                     if (hitTime > 3000.) continue;
                     if (wireID > 240.) continue;
@@ -821,25 +850,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 showerProb = total_shower_prob;
                 trackProb  = 1. - showerProb;
                 obtainedProbabilities = true;
-            } 
 
-            for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
-                if (fHitlist[iHit]->WireID().Plane != 1) continue;
-                
-                int wireID  = fHitlist[iHit]->WireID().Wire;
-                int hitTime = fHitlist[iHit]->PeakTime();
-
-                if (hitTime > 3000.) continue;
-                if (wireID > 240.) continue;
-
-                // Get NN output
-                total_shower_prob_no_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
-                num_hits_no_box++;
+                showerOutsideBoxProb = total_shower_prob_outside_box / double(num_hits_outside_box);
+                obtainedOutsideBoxProbabilities = true;
             }
-            total_shower_prob_no_box /= double(num_hits_no_box);
-
-            showerNoBoxProb = total_shower_prob_no_box;
-            obtainedNoBoxProbabilities = true;
         }
     }
 
@@ -1045,7 +1059,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     fHitCharge.reserve(nWireHits);
     fHitChargeCol.reserve(nWireHits);
 
-    // First, we get all the information about hour hits
+    // First, we get all the information about our hits
     for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
         int   hitPlane = fHitlist[iHit]->WireID().Plane;
         float hitTime0 = fSamplingRate * (fHitlist[iHit]->PeakTime() - fTriggerOffset);
@@ -1152,6 +1166,9 @@ void RecoNNAllEval::beginJob() {
 
     RecoNNAllEvalTree->Branch("showerNoBoxProb", &showerNoBoxProb, "showerNoBoxProb/D");
     RecoNNAllEvalTree->Branch("obtainedNoBoxProbabilities", &obtainedNoBoxProbabilities, "obtainedNoBoxProbabilities/O");
+
+    RecoNNAllEvalTree->Branch("showerOutsideBoxProb", &showerOutsideBoxProb, "showerOutsideBoxProb/D");
+    RecoNNAllEvalTree->Branch("obtainedOutsideBoxProbabilities", &obtainedOutsideBoxProbabilities, "obtainedOutsideBoxProbabilities/O");
 
     RecoNNAllEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
     RecoNNAllEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
@@ -1733,6 +1750,9 @@ void RecoNNAllEval::resetTree() {
 
     showerNoBoxProb = 0.;
     obtainedNoBoxProbabilities = false;
+
+    showerOutsideBoxProb = 0.;
+    obtainedOutsideBoxProbabilities = false;
 
     WC2TPCtrkID = -99999;
 
