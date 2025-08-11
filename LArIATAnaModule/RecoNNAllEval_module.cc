@@ -385,6 +385,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<float>                fHitChargeCol;
         std::vector<int>                  hitRecoAsTrackKey;
         std::vector<int>                  hitWC2TPCKey;
+        std::vector<int>                  hitThroughTrack;
         double                            primaryEndPointHitX;
         double                            primaryEndPointHitW;
 
@@ -1101,10 +1102,16 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         int  nHits     = 0;
         if (bVerbose) std::cout << "  Track id: " << thisTrack->ID() << std::endl;
 
+        bool isThroughGoing = (
+            (!isWithinReducedVolume(thisTrack->Start().X(), thisTrack->Start().Y(), thisTrack->Start().Z())) &&
+            (!isWithinReducedVolume(thisTrack->End().X(), thisTrack->End().Y(), thisTrack->End().Z()))
+        );
+
         if (fmthm.isValid()) {
             auto vhit = fmthm.at(thisTrack->ID());
             for (size_t h = 0; h < vhit.size(); ++h) {
-                if (thisTrack->ID() == WC2TPCtrkID) hitWC2TPCKey.push_back(vhit[h].key());
+                if (thisTrack->ID() == WC2TPCtrkID) { hitWC2TPCKey.push_back(vhit[h].key()); }
+                else if (isThroughGoing) hitThroughTrack.push_back(vhit[h].key());
                 hitRecoAsTrackKey.push_back(vhit[h].key());
                 ++nHits;
             }
@@ -1294,6 +1301,7 @@ void RecoNNAllEval::beginJob() {
 
     RecoNNAllEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
     RecoNNAllEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
+    RecoNNAllEvalTree->Branch("hitThroughTrack", "std::vector<int>", &hitThroughTrack);
     RecoNNAllEvalTree->Branch("primaryEndPointHitX", &primaryEndPointHitX, "primaryEndPointHitX/D");
     RecoNNAllEvalTree->Branch("primaryEndPointHitW", &primaryEndPointHitW, "primaryEndPointHitW/D");
 
@@ -1851,6 +1859,7 @@ void RecoNNAllEval::resetTree() {
 
     hitRecoAsTrackKey.clear();
     hitWC2TPCKey.clear();
+    hitThroughTrack.clear();
     primaryEndPointHitX = 0.;
     primaryEndPointHitW = 0.;
 
