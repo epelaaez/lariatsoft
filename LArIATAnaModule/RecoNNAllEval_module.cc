@@ -594,6 +594,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     if (isPionAbsorptionSignal) {
         if (numVisibleProtons == 0) backgroundType = 0;
         if (numVisibleProtons > 0)  backgroundType = 1;
+    } else if (backgroundType == 12 || (backgroundType == 6 && numVisibleProtons == 0)) {
+        hTotalEvents->Fill(13);
+    } else if (backgroundType == 6 && numVisibleProtons > 0) {
+        hTotalEvents->Fill(14);
     }
     hTotalEvents->Fill(backgroundType);
 
