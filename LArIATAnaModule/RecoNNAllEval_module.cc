@@ -224,7 +224,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
 
         // Background information
         int backgroundType; 
-        int NUM_BACKGROUND_TYPES = 13;
+        int NUM_BACKGROUND_TYPES = 15;
         // Background types:
         //    0:  0p pion absorption
         //    1:  Np pion absorption
@@ -239,6 +239,8 @@ class RecoNNAllEval : public art::EDAnalyzer {
         //    10: decay
         //    11: other
         //    12: elastic scattering
+        //    13: 0p scattering
+        //    14: Np scattering
 
         // Shower probabilities information
         double trackProb;
