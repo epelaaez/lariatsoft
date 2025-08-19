@@ -46,7 +46,7 @@ outputs:
  out1:
  {
    module_type: RootOutput
-   fileName:    "%ifb_%tc_reco.root"
+   fileName:    "%ifb_%tc_reco_NNDataProduct.root"
    dataTier:    "full-reconstructed"
    compressionLevel: 1
  }
@@ -82,5 +82,5 @@ physics.producers.emtrkmichelid.PointIdAlg.OutMin:             -0.33333 # output
 # Input selection:
 physics.producers.emtrkmichelid.HitModuleLabel:                "gaushit" # all hits (used to classify leftovers from clustering)
 physics.producers.emtrkmichelid.ClusterModuleLabel:            "trajcluster" # clusters to be classified
-physics.producers.emtrkmichelid.TrackModuleLabel:              "pmtracktc"     # tracks to be classified (leave that one empty if there are no 3D tracks yet)
+physics.producers.emtrkmichelid.TrackModuleLabel:              "pmtrack"     # tracks to be classified (leave that one empty if there are no 3D tracks yet)
 physics.producers.emtrkmichelid.Views:                         [1]  # possible to run over selected views only (all views if empty list)
