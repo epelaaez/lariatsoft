@@ -155,6 +155,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         void initializeProtonPoints(TGraph *gProton);
         void initializePionPoints(TGraph *gPion);
         double computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints);
+        double energyLossCalculation(double x, double px);
 
     private: 
         // Product's names
@@ -322,6 +323,10 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<double>      wcMatchXPos;
         std::vector<double>      wcMatchYPos;
         std::vector<double>      wcMatchZPos;
+
+        // True incident KE information
+        bool                validTrueIncidentKE;
+        std::vector<double> trueIncidentKEContributions;
 
         // Reco variables
         std::vector<bool>   isTrackInverted;
@@ -501,6 +506,13 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         trajectoryInitialMomentumX      = 1000 * initialPrimaryTrajMomentum.X();
     }
 
+
+    // We want to find last point in trajectory
+    auto finalTPCPoint = std::prev(primaryTrajectory.end());
+    // If there is an interesting interaction in the trajectory, that is the final point in the TPC
+    // If no interaction in trajectory, we find vertex by looking at the daughters
+    // If no interaction, it simply is the last point in the TPC
+
     // Look at interactions through primary trajectory
     auto primaryTrajectoryProcessMap = primaryTrajectory.TrajectoryProcesses();
     TLorentzVector momBeforeInteraction, momAfterInteraction;
@@ -517,7 +529,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
             // If we do not have Coulomb scattering, and the interaction happens in the reduced volume,
             // we have an interesting interaction, so we want to save the information 
-            interactionInTrajectory = true;
+            interactionInTrajectory    = true;
+            finalTPCPoint              = primaryTrajectory.begin() + couple.first;
             trajectoryInteractionLabel = primaryTrajectory.KeyToProcess(couple.second);
 
             trajectoryInteractionX = interactionPosition.X();
@@ -783,6 +796,106 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 }
                 break;
             }
+        }
+    }
+
+    /////////////////////////////////////////////////
+    // Truth-level data about WC match incident KE //
+    /////////////////////////////////////////////////
+
+    // Setup services
+    geo::View_t view = geom->View(0);
+    auto simIDE_Prim = bt->TrackIdToSimIDEs_Ps(WC2TPCtrkID, view);
+    std::map<double, sim::IDE> orderedSimIDE;
+    for (auto ide : simIDE_Prim) orderedSimIDE[ide->z] = *ide;
+
+    // Constants
+    const double trackPitch = 0.47;
+
+    // Find first point in TPC
+    auto firstTPCPoint = primaryTrajectory.begin();
+    for (auto point = primaryTrajectory.begin(); point != std::prev(primaryTrajectory.end()); point++) {
+        if (isWithinActiveVolume(point->first.X(), point->first.Y(), point->first.Z())) {
+            firstTPCPoint = point;
+            break;
+        }
+    }
+
+    // If no interaction in trajectory, last traj point is found by looping backwards
+    if (!interactionInTrajectory) {
+        for (auto point = std::prev(primaryTrajectory.end()); point != primaryTrajectory.begin(); point--) {
+            if (isWithinActiveVolume(point->first.X(), point->first.Y(), point->first.Z())) {
+                finalTPCPoint = point;
+                break;
+            }
+        }
+    }
+
+    validTrueIncidentKE = true;
+    if (firstTPCPoint == primaryTrajectory.begin()) validTrueIncidentKE = false;
+    if (firstTPCPoint == finalTPCPoint) validTrueIncidentKE = false;
+    if (truthPrimaryPDG != -211) validTrueIncidentKE = false;
+
+    double totalLength = distance(firstTPCPoint->first.X(), finalTPCPoint->first.X(), firstTPCPoint->first.Y(), finalTPCPoint->first.Y(), firstTPCPoint->first.Z(), finalTPCPoint->first.Z());
+    if (totalLength < trackPitch) validTrueIncidentKE = false; // less than separation between two wires
+
+    // Chop up points between first and last uniformly and ordered increasing in Z
+    std::map<double, TVector3> orderedUniformTrjPts;
+
+    auto positionVector0 = (firstTPCPoint->first).Vect();
+    auto positionVector1 = (finalTPCPoint->first).Vect();
+    orderedUniformTrjPts[positionVector0.Z()] = positionVector0;
+    orderedUniformTrjPts[positionVector1.Z()] = positionVector1;
+
+    int numberPts = (int) (totalLength / trackPitch);
+    for (int iPoint = 1; iPoint <= numberPts; ++iPoint) {
+        auto newPoint = positionVector0 + iPoint * (trackPitch / totalLength) * (positionVector1 - positionVector0);
+        orderedUniformTrjPts[newPoint.Z()] = newPoint;
+    }
+
+    // If distance between last point and second to last is less than 0.235, eliminate second to last
+    auto lastPt         = (orderedUniformTrjPts.rbegin())->second;
+    auto secondtoLastPt = (std::next(orderedUniformTrjPts.rbegin()))->second;
+    double lastDist     = distance(lastPt.X(), secondtoLastPt.X(), lastPt.Y(), secondtoLastPt.Y(), lastPt.Z(), secondtoLastPt.Z());
+    if (lastDist < 0.235) orderedUniformTrjPts.erase((std::next(orderedUniformTrjPts.rbegin()))->first);
+
+    // Initial true KE
+    auto initialMomentum = firstTPCPoint->second;
+    double trueInitialKE = 1000 * (
+        TMath::Sqrt(
+            initialMomentum.X() * initialMomentum.X() + 
+            initialMomentum.Y() * initialMomentum.Y() + 
+            initialMomentum.Z() * initialMomentum.Z() + 
+            primaryMass * primaryMass
+        ) - primaryMass
+    );
+    double trueKineticEnergy = trueInitialKE;
+
+    // Get contributions to truth incident KE
+    for (auto it = std::next(orderedUniformTrjPts.begin()), old_it = orderedUniformTrjPts.begin(); it != orderedUniformTrjPts.end(); it++, old_it++) {
+        auto oldPos     = old_it->second;
+        auto currentPos = it->second;
+
+        double uniformDist = (currentPos - oldPos).Mag();
+
+        // Calculate energy deposited in this slice
+        auto old_iter           = orderedSimIDE.begin();
+        double currentDepEnergy = 0.;
+        for (auto iter = orderedSimIDE.begin(); iter != orderedSimIDE.end(); iter++, old_iter++) {
+            auto currentIDE = iter->second;
+            if (currentIDE.z < oldPos.Z()) continue;
+            if (currentIDE.z < currentPos.Z()) continue;
+            currentDepEnergy += currentIDE.energy;
+        }
+
+        // Skip tiny energy depositions
+        if (currentDepEnergy / uniformDist < 0.1) continue;
+
+        // Calculate current kinetic energy
+        trueKineticEnergy -= currentDepEnergy;
+
+        if (isWithinReducedVolume(currentPos.X(), currentPos.Y(), currentPos.Z())) {
+            trueIncidentKEContributions.push_back(currentDepEnergy);
         }
     }
 
@@ -1320,6 +1433,9 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("trajectoryInteractionZ", &trajectoryInteractionZ, "trajectoryInteractionZ/D");
     RecoNNAllEvalTree->Branch("trajectoryInteractionKE", &trajectoryInteractionKE, "trajectoryInteractionKE/D");
     RecoNNAllEvalTree->Branch("trajectoryInitialMomentumX", &trajectoryInitialMomentumX, "trajectoryInitialMomentumX/D");
+
+    RecoNNAllEvalTree->Branch("validTrueIncidentKE", &validTrueIncidentKE, "validTrueIncidentKE/O");
+    RecoNNAllEvalTree->Branch("trueIncidentKEContributions", "std::vector<double>", &trueIncidentKEContributions);
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1443,6 +1559,17 @@ bool RecoNNAllEval::isWithinReducedVolume(double x, double y, double z) {
         (y > RminY) && (y < RmaxY) && 
         (z > RminZ) && (z < RmaxZ)
     );
+}
+double RecoNNAllEval::energyLossCalculation(double x, double px) {
+    // x in cm and px in MeV
+    double discriminant = 0.0733 * px + 1.3 * x - 31; 
+    if (discriminant > 0) {
+        // particles going through the halo hole
+        return 24.5;
+    } else {
+        // particles going through the halo paddle
+        return 32.5;
+    }
 }
 
 void RecoNNAllEval::fillSignalInformation(
@@ -1877,6 +2004,9 @@ void RecoNNAllEval::resetTree() {
     trajectoryInteractionZ     = -99999.;
     trajectoryInteractionKE    = -99999.;
     trajectoryInitialMomentumX = -99999.;
+
+    validTrueIncidentKE = false;
+    trueIncidentKEContributions.clear();
 }
 
 void RecoNNAllEval::endJob() {
