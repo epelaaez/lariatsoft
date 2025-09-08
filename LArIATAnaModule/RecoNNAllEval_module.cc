@@ -412,7 +412,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         // Reduced volume for interactions
         const double RminX =  5.0;
         const double RmaxX = 42.0;
-        const double RminY =-15.0; 
+        const double RminY =-15.0;
         const double RmaxY = 15.0;
         const double RminZ =  8.0;
         const double RmaxZ = 82.0;
@@ -478,7 +478,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     TLorentzVector primaryStart, primaryEnd;
     TLorentzVector vertexMomentum;
     simb::MCTrajectory primaryTrajectory;
-    double primaryMass = 0.;
+    double primaryMass = 0.; int primaryPartID;
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
@@ -489,6 +489,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             truthPrimaryVertexZ    = part->EndZ(); 
             primaryStart           = part->Position(); primaryEnd = part->EndPosition();
             primaryMass            = part->Mass();
+            primaryPartID          = part->TrackId();
             truthPrimaryIncidentKE = part->E() - primaryMass;
             if (part->NumberTrajectoryPoints() > 1) {
                 vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
@@ -505,7 +506,6 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         auto initialPrimaryTrajMomentum = firstPrimaryPoint->second;
         trajectoryInitialMomentumX      = 1000 * initialPrimaryTrajMomentum.X();
     }
-
 
     // We want to find last point in trajectory
     auto finalTPCPoint = std::prev(primaryTrajectory.end());
@@ -546,6 +546,16 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 momBeforeInteraction = (primaryTrajectory.at(couple.first)).second;
             }
             momAfterInteraction  = (primaryTrajectory.at(couple.first)).second;
+        }
+    }
+
+    // If no interaction in trajectory, last traj point is found by looping backwards
+    if (!interactionInTrajectory) {
+        for (auto point = std::prev(primaryTrajectory.end()); point != primaryTrajectory.begin(); point--) {
+            if (isWithinActiveVolume(point->first.X(), point->first.Y(), point->first.Z())) {
+                finalTPCPoint = point;
+                break;
+            }
         }
     }
 
@@ -616,6 +626,98 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     }
     hTotalEvents->Fill(backgroundType);
 
+    /////////////////////////////////////////////////
+    // Truth-level data about WC match incident KE //
+    /////////////////////////////////////////////////
+
+    // Setup services
+    art::ServiceHandle<geo::Geometry> geom;
+    art::ServiceHandle<cheat::BackTrackerService> bt;
+    geo::View_t view = geom->View(0);
+    auto simIDE_Prim = bt->TrackIdToSimIDEs_Ps(primaryPartID, view);
+    std::map<double, sim::IDE> orderedSimIDE;
+    for (auto ide : simIDE_Prim) orderedSimIDE[ide->z] = *ide;
+
+    // Constants
+    const double trackPitch = 0.47;
+
+    // Find first point in TPC
+    auto firstTPCPoint = primaryTrajectory.begin();
+    for (auto point = primaryTrajectory.begin(); point != std::prev(primaryTrajectory.end()); point++) {
+        if (isWithinActiveVolume(point->first.X(), point->first.Y(), point->first.Z())) {
+            firstTPCPoint = point;
+            break;
+        }
+    }
+
+    validTrueIncidentKE = true;
+    if (firstTPCPoint == primaryTrajectory.begin()) validTrueIncidentKE = false;
+    if (firstTPCPoint == finalTPCPoint) validTrueIncidentKE = false;
+    if (truthPrimaryPDG != -211) validTrueIncidentKE = false;
+
+    double totalLength = distance(firstTPCPoint->first.X(), finalTPCPoint->first.X(), firstTPCPoint->first.Y(), finalTPCPoint->first.Y(), firstTPCPoint->first.Z(), finalTPCPoint->first.Z());
+    if (totalLength < trackPitch) validTrueIncidentKE = false; // less than separation between two wires
+
+    // Chop up points between first and last uniformly and ordered increasing in Z
+    std::map<double, TVector3> orderedUniformTrjPts;
+
+    auto positionVector0 = (firstTPCPoint->first).Vect();
+    auto positionVector1 = (finalTPCPoint->first).Vect();
+    orderedUniformTrjPts[positionVector0.Z()] = positionVector0;
+    orderedUniformTrjPts[positionVector1.Z()] = positionVector1;
+
+    int numberPts = (int) (totalLength / trackPitch);
+    for (int iPoint = 1; iPoint <= numberPts; ++iPoint) {
+        auto newPoint = positionVector0 + iPoint * (trackPitch / totalLength) * (positionVector1 - positionVector0);
+        orderedUniformTrjPts[newPoint.Z()] = newPoint;
+    }
+
+    // If distance between last point and second to last is less than 0.235, eliminate second to last
+    auto lastPt         = (orderedUniformTrjPts.rbegin())->second;
+    auto secondtoLastPt = (std::next(orderedUniformTrjPts.rbegin()))->second;
+    double lastDist     = distance(lastPt.X(), secondtoLastPt.X(), lastPt.Y(), secondtoLastPt.Y(), lastPt.Z(), secondtoLastPt.Z());
+    if (lastDist < 0.235) orderedUniformTrjPts.erase((std::next(orderedUniformTrjPts.rbegin()))->first);
+
+    // Initial true KE
+    auto initialMomentum = firstTPCPoint->second;
+    double trueInitialKE = 1000 * (
+        TMath::Sqrt(
+            initialMomentum.X() * initialMomentum.X() + 
+            initialMomentum.Y() * initialMomentum.Y() + 
+            initialMomentum.Z() * initialMomentum.Z() + 
+            primaryMass * primaryMass
+        ) - primaryMass
+    );
+    double trueKineticEnergy = trueInitialKE;
+
+    // Get contributions to truth incident KE
+    for (auto it = std::next(orderedUniformTrjPts.begin()), old_it = orderedUniformTrjPts.begin(); it != orderedUniformTrjPts.end(); it++, old_it++) {
+        auto oldPos     = old_it->second;
+        auto currentPos = it->second;
+
+        double uniformDist = (currentPos - oldPos).Mag();
+
+        // Calculate energy deposited in this slice
+        auto old_iter           = orderedSimIDE.begin();
+        double currentDepEnergy = 0.;
+        for (auto iter = orderedSimIDE.begin(); iter != orderedSimIDE.end(); iter++, old_iter++) {
+            auto currentIDE = iter->second;
+            if (currentIDE.z < oldPos.Z()) continue;
+            if (currentIDE.z > currentPos.Z()) continue;
+            currentDepEnergy += currentIDE.energy;
+        }
+
+        // Skip tiny energy depositions
+        if (currentDepEnergy / uniformDist < 0.1) continue;
+
+        // Calculate current kinetic energy
+        trueKineticEnergy -= currentDepEnergy;
+
+        if (isWithinReducedVolume(currentPos.X(), currentPos.Y(), currentPos.Z())) {
+            trueIncidentKEContributions.push_back(trueKineticEnergy);
+        }
+    }
+
     //////////////////////
     // Wire chamber tracks
     //////////////////////
@@ -625,11 +727,11 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     art::Handle<std::vector<ldp::WCTrack>> wctrackHandle;
     std::vector<art::Ptr<ldp::WCTrack>>    wctrack;
     // If there is no wire chamber tracks for label, return
-    if (!e.getByLabel(strWCTrackBuilderLabel, wctrackHandle)) return;
+    if (!e.getByLabel(strWCTrackBuilderLabel, wctrackHandle)) { RecoNNAllEvalTree->Fill(); return; }
     art::fill_ptr_vector(wctrack, wctrackHandle);
 
     int numWCtrks = wctrack.size(); // number of wire chamber tracks
-    if (numWCtrks != 1) return; 
+    if (numWCtrks != 1) { RecoNNAllEvalTree->Fill(); return; }
 
     // Get wcTrack momentum
     WCTrackMomentum = wctrack[0]->Momentum();
@@ -654,14 +756,14 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     art::Handle<std::vector<recob::Track>> tpcTrackHandle;
     std::vector<art::Ptr<recob::Track>> tracklist;
     // If there are no tpc chamber tracks for label, return
-    if (!e.getByLabel(strTPCTrackHandleLabel, tpcTrackHandle)) return; 
+    if (!e.getByLabel(strTPCTrackHandleLabel, tpcTrackHandle)) { RecoNNAllEvalTree->Fill(); return; }
     art::fill_ptr_vector(tracklist, tpcTrackHandle);
 
     // Get hits associated with TPC tracks
     art::FindManyP<recob::Hit> HitsInTrack(tpcTrackHandle, e, strTPCTrackHandleLabel);
 
     int numTracksReco = tracklist.size();
-    if (!numTracksReco) return; // If no TPC tracks, return
+    if (!numTracksReco) { RecoNNAllEvalTree->Fill(); return; } // If no TPC tracks, return
     
     if (bVerbose) std::cout << "Number of TPC reco tracks: " << numTracksReco << std::endl;
     if (bVerbose) std::cout << std::endl;
@@ -699,11 +801,6 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     /////////////////////
     // MC particle tracks
     /////////////////////
-
-    // Geometry service
-    art::ServiceHandle<geo::Geometry> geom;
-    // Get the backtracer to recover true quantities
-    art::ServiceHandle<cheat::BackTrackerService> bt;
 
     // Define calorimetry
     art::FindManyP<anab::Calorimetry> fmcal(tpcTrackHandle, e, strCalorimetryModuleLabel);
@@ -796,106 +893,6 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 }
                 break;
             }
-        }
-    }
-
-    /////////////////////////////////////////////////
-    // Truth-level data about WC match incident KE //
-    /////////////////////////////////////////////////
-
-    // Setup services
-    geo::View_t view = geom->View(0);
-    auto simIDE_Prim = bt->TrackIdToSimIDEs_Ps(WC2TPCtrkID, view);
-    std::map<double, sim::IDE> orderedSimIDE;
-    for (auto ide : simIDE_Prim) orderedSimIDE[ide->z] = *ide;
-
-    // Constants
-    const double trackPitch = 0.47;
-
-    // Find first point in TPC
-    auto firstTPCPoint = primaryTrajectory.begin();
-    for (auto point = primaryTrajectory.begin(); point != std::prev(primaryTrajectory.end()); point++) {
-        if (isWithinActiveVolume(point->first.X(), point->first.Y(), point->first.Z())) {
-            firstTPCPoint = point;
-            break;
-        }
-    }
-
-    // If no interaction in trajectory, last traj point is found by looping backwards
-    if (!interactionInTrajectory) {
-        for (auto point = std::prev(primaryTrajectory.end()); point != primaryTrajectory.begin(); point--) {
-            if (isWithinActiveVolume(point->first.X(), point->first.Y(), point->first.Z())) {
-                finalTPCPoint = point;
-                break;
-            }
-        }
-    }
-
-    validTrueIncidentKE = true;
-    if (firstTPCPoint == primaryTrajectory.begin()) validTrueIncidentKE = false;
-    if (firstTPCPoint == finalTPCPoint) validTrueIncidentKE = false;
-    if (truthPrimaryPDG != -211) validTrueIncidentKE = false;
-
-    double totalLength = distance(firstTPCPoint->first.X(), finalTPCPoint->first.X(), firstTPCPoint->first.Y(), finalTPCPoint->first.Y(), firstTPCPoint->first.Z(), finalTPCPoint->first.Z());
-    if (totalLength < trackPitch) validTrueIncidentKE = false; // less than separation between two wires
-
-    // Chop up points between first and last uniformly and ordered increasing in Z
-    std::map<double, TVector3> orderedUniformTrjPts;
-
-    auto positionVector0 = (firstTPCPoint->first).Vect();
-    auto positionVector1 = (finalTPCPoint->first).Vect();
-    orderedUniformTrjPts[positionVector0.Z()] = positionVector0;
-    orderedUniformTrjPts[positionVector1.Z()] = positionVector1;
-
-    int numberPts = (int) (totalLength / trackPitch);
-    for (int iPoint = 1; iPoint <= numberPts; ++iPoint) {
-        auto newPoint = positionVector0 + iPoint * (trackPitch / totalLength) * (positionVector1 - positionVector0);
-        orderedUniformTrjPts[newPoint.Z()] = newPoint;
-    }
-
-    // If distance between last point and second to last is less than 0.235, eliminate second to last
-    auto lastPt         = (orderedUniformTrjPts.rbegin())->second;
-    auto secondtoLastPt = (std::next(orderedUniformTrjPts.rbegin()))->second;
-    double lastDist     = distance(lastPt.X(), secondtoLastPt.X(), lastPt.Y(), secondtoLastPt.Y(), lastPt.Z(), secondtoLastPt.Z());
-    if (lastDist < 0.235) orderedUniformTrjPts.erase((std::next(orderedUniformTrjPts.rbegin()))->first);
-
-    // Initial true KE
-    auto initialMomentum = firstTPCPoint->second;
-    double trueInitialKE = 1000 * (
-        TMath::Sqrt(
-            initialMomentum.X() * initialMomentum.X() + 
-            initialMomentum.Y() * initialMomentum.Y() + 
-            initialMomentum.Z() * initialMomentum.Z() + 
-            primaryMass * primaryMass
-        ) - primaryMass
-    );
-    double trueKineticEnergy = trueInitialKE;
-
-    // Get contributions to truth incident KE
-    for (auto it = std::next(orderedUniformTrjPts.begin()), old_it = orderedUniformTrjPts.begin(); it != orderedUniformTrjPts.end(); it++, old_it++) {
-        auto oldPos     = old_it->second;
-        auto currentPos = it->second;
-
-        double uniformDist = (currentPos - oldPos).Mag();
-
-        // Calculate energy deposited in this slice
-        auto old_iter           = orderedSimIDE.begin();
-        double currentDepEnergy = 0.;
-        for (auto iter = orderedSimIDE.begin(); iter != orderedSimIDE.end(); iter++, old_iter++) {
-            auto currentIDE = iter->second;
-            if (currentIDE.z < oldPos.Z()) continue;
-            if (currentIDE.z > currentPos.Z()) continue;
-            currentDepEnergy += currentIDE.energy;
-        }
-
-        // Skip tiny energy depositions
-        if (currentDepEnergy / uniformDist < 0.1) continue;
-
-        // Calculate current kinetic energy
-        trueKineticEnergy -= currentDepEnergy;
-
-        if (isWithinReducedVolume(currentPos.X(), currentPos.Y(), currentPos.Z())) {
-            trueIncidentKEContributions.push_back(trueKineticEnergy);
         }
     }
 
