@@ -884,7 +884,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         for (auto iter = orderedSimIDE.begin(); iter != orderedSimIDE.end(); iter++, old_iter++) {
             auto currentIDE = iter->second;
             if (currentIDE.z < oldPos.Z()) continue;
-            if (currentIDE.z < currentPos.Z()) continue;
+            if (currentIDE.z > currentPos.Z()) continue;
             currentDepEnergy += currentIDE.energy;
         }
 
@@ -895,7 +895,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         trueKineticEnergy -= currentDepEnergy;
 
         if (isWithinReducedVolume(currentPos.X(), currentPos.Y(), currentPos.Z())) {
-            trueIncidentKEContributions.push_back(currentDepEnergy);
+            trueIncidentKEContributions.push_back(trueKineticEnergy);
         }
     }
 
