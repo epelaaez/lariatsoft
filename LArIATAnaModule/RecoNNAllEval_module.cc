@@ -437,6 +437,14 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     if (bVerbose) std::cout << "Run: " << run << ", subrun: " << subrun << ", event: " << event << ", is real data: " << isData << std::endl;
     if (bVerbose) std::cout << std::endl;
 
+    if (
+        event == 91686 ||
+        event == 91707 || 
+        event == 115702 || 
+        event == 172759 ||
+        event == 264599
+    ) return; // Bad event, crashes the code for some reason
+
     // Get detector properties
     fEfield           = fDetProp->Efield(0);
     fDriftVelocity[0] = fDetProp->DriftVelocity(fEfield, fDetProp->Temperature());

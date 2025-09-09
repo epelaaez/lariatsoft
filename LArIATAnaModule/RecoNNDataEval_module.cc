@@ -260,12 +260,12 @@ class RecoNNDataEval : public art::EDAnalyzer {
         std::vector<double> WC2TPCLocationsY;
         std::vector<double> WC2TPCLocationsZ;
 
-        std::vector<double>      wcMatchResR;
-        std::vector<double>      wcMatchEDep;
-        std::vector<double>      wcMatchDEDX;
-        std::vector<double>      wcMatchXPos;
-        std::vector<double>      wcMatchYPos;
-        std::vector<double>      wcMatchZPos;
+        std::vector<double> wcMatchResR;
+        std::vector<double> wcMatchEDep;
+        std::vector<double> wcMatchDEDX;
+        std::vector<double> wcMatchXPos;
+        std::vector<double> wcMatchYPos;
+        std::vector<double> wcMatchZPos;
 
         // TOF variables
         double tofObject;
@@ -387,7 +387,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     art::fill_ptr_vector(wctrack, wctrackHandle);
 
     int numWCtrks = wctrack.size(); // number of wire chamber tracks
-    if (numWCtrks != 1) return; 
+    if (numWCtrks != 1) return;
 
     // Get wcTrack momentum
     WCTrackMomentum = wctrack[0]->Momentum();
