@@ -386,8 +386,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     if (!e.getByLabel(strWCTrackBuilderLabel, wctrackHandle)) return;
     art::fill_ptr_vector(wctrack, wctrackHandle);
 
-    int numWCtrks = wctrack.size(); // number of wire chamber tracks
-    if (numWCtrks != 1) return;
+    if (wctrack.size() != 1) return; // number of wire-chamber tracks must be one
 
     // Get wcTrack momentum
     WCTrackMomentum = wctrack[0]->Momentum();
@@ -489,14 +488,28 @@ void RecoNNDataEval::analyze(art::Event const &e) {
         (USTOF_Center[2] - DSTOF_Center[2]) * (USTOF_Center[2] - DSTOF_Center[2])
     );
 
-    double radical = tofObject * 29.9792458 * 29.9792458 * tofObject / (distanceTraveled * distanceTraveled) - 1;
+    distanceTraveled     /= 100.; // cm to meters
+    double radical        = tofObject * 0.299792458 * 0.299792458 * tofObject / (distanceTraveled * distanceTraveled) - 1;
+    double tanThetaCosPhi = TMath::Tan(WCTheta) * TMath::Cos(WCPhi);
+    double tanThetaSinPhi = TMath::Tan(WCTheta) * TMath::Sin(WCPhi);
+    double den            = TMath::Sqrt(1 + tanThetaCosPhi * tanThetaCosPhi);
+    double wcPz           = WCTrackMomentum / den;
+    double wcP            = wcPz * TMath::Sqrt(1 + TMath::Tan(WCTheta) * TMath::Tan(WCTheta));
+
+    // std::cout << "===========" << std::endl;
+    // std::cout << "WCP: " << wcP << std::endl;
+    // std::cout << "WCMomentum: " << WCTrackMomentum << std::endl;
+    // std::cout << "TOF: " << tofObject << std::endl;
+    // std::cout << "Distance traveled: " << distanceTraveled << std::endl;
     if (tofObject > 0) {
         if (radical < 0) {
-            TOFMass = -WCTrackMomentum * pow(-radical, 0.5);
+            TOFMass = -wcP * pow(-radical, 0.5);
         } else {
-            TOFMass = WCTrackMomentum * pow(radical, 0.5);
+            TOFMass = wcP * pow(radical, 0.5);
         }
     }
+    // std::cout << "Computed mass: " << TOFMass << std::endl;
+    // std::cout << "===========" << std::endl;
 
     if (bVerbose) std::cout << "TOF Mass: " << TOFMass << std::endl;
 
@@ -549,6 +562,11 @@ void RecoNNDataEval::analyze(art::Event const &e) {
                 WC2TPCPrimaryEndY   = recoWC2TPCEnd.Y();
                 WC2TPCPrimaryEndZ   = recoWC2TPCEnd.Z();
                 WC2TPCPrimaryLength = thisTrack->Length();
+
+                if (bVerbose) std::cout << "WC2TPC track length: " << WC2TPCPrimaryLength << std::endl;
+                if (bVerbose) std::cout << "WC2TPC primary begin (x,y,z): (" << WC2TPCPrimaryBeginX << ", " << WC2TPCPrimaryBeginY << ", " << WC2TPCPrimaryBeginZ << ")" << std::endl;
+                if (bVerbose) std::cout << "WC2TPC primary end   (x,y,z): (" << WC2TPCPrimaryEndX   << ", " << WC2TPCPrimaryEndY   << ", " << WC2TPCPrimaryEndZ   << ")" << std::endl;
+                if (bVerbose) std::cout << std::endl;
 
                 // Get calo data
                 std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackEDep; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
@@ -654,6 +672,8 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     //////////////////////////////////////
 
     int numSmallTracks = 0;
+    if (bVerbose) std::cout << "Looping through all TPC tracks " << std::endl;
+    if (bVerbose) std::cout << std::endl;
     for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
         auto thisTrack = tracklist.at(trk_idx);
         recob::TrackTrajectory::Point_t recoBeginning;
@@ -685,6 +705,9 @@ void RecoNNDataEval::analyze(art::Event const &e) {
             pow(recoBeginning.Z() - recoEnd.Z(), 2)
         );
         if (thisTrackLength < SmallTrackLength) numSmallTracks++;
+        if (bVerbose) std::cout << "Track length: " << thisTrackLength << std::endl;
+        if (bVerbose) std::cout << "  Start (x,y,z): (" << recoBeginning.X() << ", " << recoBeginning.Y() << ", " << recoBeginning.Z() << ")" << std::endl;
+        if (bVerbose) std::cout << "  End   (x,y,z): (" << recoEnd.X()       << ", " << recoEnd.Y()       << ", " << recoEnd.Z()       << ")" << std::endl;
 
         // Calo data
         std::vector<double> thisTrackDEDX; std::vector<double> thisTrackResR; std::vector<double> thisTrackEDep; std::vector<double> thisTrackXPos; std::vector<double> thisTrackYPos; std::vector<double> thisTrackZPos; 
@@ -692,10 +715,13 @@ void RecoNNDataEval::analyze(art::Event const &e) {
         recoDEDX.push_back(thisTrackDEDX); recoResR.push_back(thisTrackResR); recoEDep.push_back(thisTrackEDep); recoMeanDEDX.push_back(thisMeanDEDX); recoXPos.push_back(thisTrackXPos); recoYPos.push_back(thisTrackYPos); recoZPos.push_back(thisTrackZPos);
 
         // Get chi^2 values
-        if (bVerbose) std::cout << "Computing chi^2 values: " << std::endl;
+        if (bVerbose) std::cout << "Computing chi^2 values " << std::endl;
         int    caloPoints = thisTrackDEDX.size(); 
         double protonChi2 = computeReducedChi2(gProton, thisTrackResR, thisTrackDEDX, caloPoints);
         double pionChi2   = computeReducedChi2(gPion, thisTrackResR, thisTrackDEDX, caloPoints);
+        if (bVerbose) std::cout << "  Pion chi^2: " << pionChi2 << std::endl;
+        if (bVerbose) std::cout << "  Proton chi^2: " << protonChi2 << std::endl;
+        if (bVerbose) std::cout << std::endl;
 
         // Find tracks near vertex
         bool thisTrackNearVertex = false;
@@ -804,10 +830,9 @@ void RecoNNDataEval::analyze(art::Event const &e) {
             float mean  = fHitCharge.at(iHit) * prob;
             float sigma = sqrt(mean*(1. - prob));
             float fac   = (fRand->Gaus(mean, sigma) * ltCorFac) / fHitCharge.at(iHit);
-            fHitCharge.at(iHit)   *= fac;
+            fHitCharge.at(iHit) *= fac;
         }
     }
-
     if (bVerbose) std::cout << "Hits found for this event: " << fHitKey.size() << std::endl;
 
     // Associations between tracks and hits
@@ -857,7 +882,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     primaryEndPointHitX = fHitX[endpointHitIdx];
     primaryEndPointHitW = fHitW[endpointHitIdx];
 
-    if (bVerbose) std::cout << "End hit X: " << primaryEndPointHitX << " W: " << primaryEndPointHitW << std::endl;
+    if (bVerbose) std::cout << "End hit for WC2TPC track X: " << primaryEndPointHitX << " W: " << primaryEndPointHitW << std::endl;
     if (bVerbose) std::cout << std::endl;
 
     RecoNNDataEvalTree->Fill();

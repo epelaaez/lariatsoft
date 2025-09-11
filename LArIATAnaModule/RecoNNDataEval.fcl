@@ -27,7 +27,7 @@ physics: {
     analyzers: {
         RecoNNDataEval: {
             module_type:              "RecoNNDataEval"
-            Verbose:                  false
+            Verbose:                  true
             WCTrackBuilderLabel:      wctrack
             TPCTrackHandleLabel:      pmtrack
             WC2TPModuleLabel:         wctracktpctrackmatch
@@ -38,7 +38,7 @@ physics: {
             ProtonEnergyUpperBound:   1.0
             HitsModule:               "gaushit"
             HitsInstance:             ""
-            CaloAlg:                  @local::standard_calorimetryalgmc
+            CaloAlg:                  @local::standard_calorimetryalgdata
             NNetModuleLabel:          "emtrkmichelid:emtrkmichel:EmTrackId"
             TOFModuleLabel:           tof
         }
@@ -50,7 +50,7 @@ physics: {
     reco: [ ]
     ana: [ RecoNNDataEval ]
 
-    stream1: [ out1 ]
+    stream1: [ ]
 
     #end_paths is a keyword and contains the paths that do not modify the art::Event, 
     #ie analyzers and output streams.  these all run simultaneously
