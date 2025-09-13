@@ -256,11 +256,13 @@ class RecoNNAllEval : public art::EDAnalyzer {
 
         // Truth primary information
         int                      truthPrimaryPDG;
+        int                      truthPrimaryID;
         double                   truthPrimaryVertexX;
         double                   truthPrimaryVertexY;
         double                   truthPrimaryVertexZ;
         double                   truthPrimaryIncidentKE;
         double                   truthPrimaryVertexKE;
+        std::vector<int>         truthPrimaryDaughtersID;
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
@@ -285,6 +287,12 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<int>         truthSecondaryPionDaughtersPDG;
         std::vector<std::string> truthSecondaryPionDaughtersProcess;
         std::vector<double>      truthSecondaryPionDaughtersKE;
+
+        // Shower product information for charge exchange events
+        std::vector<int>         chExchShowerIDs;
+        std::vector<std::string> chExchShowerProcesses;
+        std::vector<int>         chExchShowerPDGs;
+        std::vector<double>      chExchShowerLengths;
 
         // WC variables
         int    WC2TPCtrkID;
@@ -491,6 +499,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
             truthPrimaryPDG = part->PdgCode();
+            truthPrimaryID  = part->TrackId();
             for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
             truthPrimaryVertexX    = part->EndX();
             truthPrimaryVertexY    = part->EndY();
@@ -503,7 +512,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
                 truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - primaryMass;
             }
-            primaryTrajectory      = part->Trajectory();
+            primaryTrajectory = part->Trajectory();
             break;
         }
     }
@@ -584,6 +593,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
             truthPrimaryDaughtersProcess.push_back(part->Process());
             truthPrimaryDaughtersPDG.push_back(part->PdgCode());
+            truthPrimaryDaughtersID.push_back(part->TrackId());
             truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
 
             // Save information for secondary pions
@@ -633,6 +643,58 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         hTotalEvents->Fill(14);
     }
     hTotalEvents->Fill(backgroundType);
+
+    ////////////////////////////////////////////////////
+    // Extra information about charge exchange events //
+    ////////////////////////////////////////////////////
+
+    if (backgroundType == 7) {
+        for (size_t p = 0; p < plist.size(); ++p) {
+            auto part = plist.Particle(p);
+            if (
+                std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end() &&
+                part->PdgCode() == 111
+            ) {
+                // Found neutral pion from charge exchange
+                chExchShowerIDs.push_back(part->TrackId());
+                chExchShowerProcesses.push_back(part->Process());
+                chExchShowerPDGs.push_back(part->PdgCode());
+                chExchShowerLengths.push_back(trackMagnitude(part));
+
+                // Recursively collect all electrons and photons from the shower
+                std::function<void(int)> collectShowerParticles = [&](int trackId) {
+                    for (size_t pidx = 0; pidx < plist.size(); ++pidx) {
+                        auto showerPart = plist.Particle(pidx);
+                        if (showerPart->Mother() == trackId) {
+                            int pdg = showerPart->PdgCode();
+
+                            // Photons, electrons, positrons
+                            if (
+                                (pdg == 22 || pdg == 11 || pdg == -11) &&
+                                isWithinActiveVolume(showerPart->EndX(), showerPart->EndY(), showerPart->EndZ())
+                            ) {
+                                chExchShowerIDs.push_back(showerPart->TrackId());
+                                chExchShowerProcesses.push_back(showerPart->Process());
+                                chExchShowerPDGs.push_back(showerPart->PdgCode());
+                                chExchShowerLengths.push_back(trackMagnitude(showerPart));
+                            }
+
+                            // Continue recursion for all daughters
+                            collectShowerParticles(showerPart->TrackId());
+                        }
+                    }
+                };
+
+                // Start recursion from each direct daughter of the neutral pion
+                collectShowerParticles(part->TrackId());
+                for (int i = 0; i < part->NumberDaughters(); ++i) {
+                    collectShowerParticles(part->Daughter(i));
+                }
+
+                break;
+            }
+        }
+    }
 
     /////////////////////////////////////////////////
     // Truth-level data about WC match incident KE //
@@ -993,7 +1055,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         recob::TrackTrajectory::Point_t recoEnd;
 
         // Continue if ID is that of matched beamline particle
-        if (thisTrack->ID() == WC2TPCtrkID) continue;
+        // if (thisTrack->ID() == WC2TPCtrkID) continue;
         if (bVerbose) std::cout << "Looking at track with ID: " << thisTrack->ID() << std::endl;
 
         bool isThisTrackReversed = false;
@@ -1302,11 +1364,13 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("obtainedOutsideBoxProbabilities", &obtainedOutsideBoxProbabilities, "obtainedOutsideBoxProbabilities/O");
 
     RecoNNAllEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
+    RecoNNAllEvalTree->Branch("truthPrimaryID", &truthPrimaryID, "truthPrimaryID/I");
     RecoNNAllEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
     RecoNNAllEvalTree->Branch("truthPrimaryVertexKE", &truthPrimaryVertexKE, "truthPrimaryVertexKE/D");
     RecoNNAllEvalTree->Branch("truthPrimaryVertexX", &truthPrimaryVertexX, "truthPrimaryVertexX/D");
     RecoNNAllEvalTree->Branch("truthPrimaryVertexY", &truthPrimaryVertexY, "truthPrimaryVertexY/D");
     RecoNNAllEvalTree->Branch("truthPrimaryVertexZ", &truthPrimaryVertexZ, "truthPrimaryVertexZ/D");
+    RecoNNAllEvalTree->Branch("truthPrimaryDaughtersID", "std::vector<int>", &truthPrimaryDaughtersID);
     RecoNNAllEvalTree->Branch("truthPrimaryDaughtersPDG", "std::vector<int>", &truthPrimaryDaughtersPDG);
     RecoNNAllEvalTree->Branch("truthPrimaryDaughtersProcess", "std::vector<std::string>", &truthPrimaryDaughtersProcess);
     RecoNNAllEvalTree->Branch("truthPrimaryDaughtersKE", "std::vector<double>", &truthPrimaryDaughtersKE);
@@ -1441,6 +1505,11 @@ void RecoNNAllEval::beginJob() {
 
     RecoNNAllEvalTree->Branch("validTrueIncidentKE", &validTrueIncidentKE, "validTrueIncidentKE/O");
     RecoNNAllEvalTree->Branch("trueIncidentKEContributions", "std::vector<double>", &trueIncidentKEContributions);
+
+    RecoNNAllEvalTree->Branch("chExchShowerIDs", "std::vector<int>", &chExchShowerIDs);
+    RecoNNAllEvalTree->Branch("chExchShowerProcesses", "std::vector<std::string>", &chExchShowerProcesses);
+    RecoNNAllEvalTree->Branch("chExchShowerPDGs", "std::vector<int>", &chExchShowerPDGs);
+    RecoNNAllEvalTree->Branch("chExchShowerLengths", "std::vector<double>", &chExchShowerLengths);
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1962,12 +2031,14 @@ void RecoNNAllEval::resetTree() {
     recoZPos.clear();
     recoMeanDEDX.clear();
 
+    truthPrimaryID         = -99999;
     truthPrimaryPDG        = -99999;
     truthPrimaryIncidentKE = -99999;
     truthPrimaryVertexKE   = -99999;
     truthPrimaryVertexX    = -99999;
     truthPrimaryVertexY    = -99999;
     truthPrimaryVertexZ    = -99999;
+    truthPrimaryDaughtersID.clear();
     truthPrimaryDaughtersPDG.clear();
     truthPrimaryDaughtersProcess.clear();
     truthPrimaryDaughtersKE.clear();
@@ -2012,6 +2083,11 @@ void RecoNNAllEval::resetTree() {
 
     validTrueIncidentKE = false;
     trueIncidentKEContributions.clear();
+    
+    chExchShowerIDs.clear();
+    chExchShowerProcesses.clear();
+    chExchShowerPDGs.clear();
+    chExchShowerLengths.clear();
 }
 
 void RecoNNAllEval::endJob() {
