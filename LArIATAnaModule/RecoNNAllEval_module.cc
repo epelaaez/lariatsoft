@@ -296,6 +296,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
 
         // WC variables
         int    WC2TPCtrkID;
+        int    WC2TPCsize;
         double WCTrackMomentum;
         double WC2TPCPrimaryBeginX;
         double WC2TPCPrimaryBeginY;
@@ -845,6 +846,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     art::FindOneP<recob::Track> fWC2TPC(wctrackHandle, e, strWC2TPCModuleLabel);
 
     if (fWC2TPC.isValid()) {
+        WC2TPCsize = 0;
         if (bVerbose) std::cout << "Wire chamber to TPC is valid with size: " << fWC2TPC.size() << std::endl;
         for (unsigned int i = 0; i < fWC2TPC.size(); ++i) {
             cet::maybe_ref<recob::Track const> trackWC2TPC(*fWC2TPC.at(i));
@@ -861,6 +863,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             WC2TPCPrimaryBeginX = recoWC2TPCBeginning.X();
             WC2TPCPrimaryBeginY = recoWC2TPCBeginning.Y();
             WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();
+
+            // Found valid WC2TPC match
+            WC2TPCsize++;
         } // end trackWC2TPC loop
     } else {
         if (bVerbose) std::cout << "Wire chamber to TPC is NOT valid!" << std::endl;
@@ -1386,6 +1391,7 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("truthSecondaryPionDaughtersKE", "std::vector<double>", &truthSecondaryPionDaughtersKE); 
 
     RecoNNAllEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
+    RecoNNAllEvalTree->Branch("WC2TPCsize", &WC2TPCsize, "WC2TPCsize/I");
     RecoNNAllEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
     RecoNNAllEvalTree->Branch("WC2TPCPrimaryBeginX", &WC2TPCPrimaryBeginX, "WC2TPCPrimaryBeginX/D");
     RecoNNAllEvalTree->Branch("WC2TPCPrimaryBeginY", &WC2TPCPrimaryBeginY, "WC2TPCPrimaryBeginY/D");
@@ -1970,6 +1976,7 @@ void RecoNNAllEval::resetTree() {
     obtainedOutsideBoxProbabilities = false;
 
     WC2TPCtrkID = -99999;
+    WC2TPCsize  = -99999;
 
     wcMatchPDG = -99999;
     wcMatchProcess = "";

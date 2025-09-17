@@ -236,6 +236,7 @@ class RecoNNDataEval : public art::EDAnalyzer {
 
         // WC variables
         int    WC2TPCtrkID;
+        int    WC2TPCsize;
         double WCTrackMomentum;
         double WC2TPCPrimaryBeginX;
         double WC2TPCPrimaryBeginY;
@@ -427,6 +428,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     art::FindOneP<recob::Track> fWC2TPC(wctrackHandle, e, strWC2TPCModuleLabel);
 
     if (fWC2TPC.isValid()) {
+        WC2TPCsize = 0;
         if (bVerbose) std::cout << "Wire chamber to TPC is valid with size: " << fWC2TPC.size() << std::endl;
         for (unsigned int i = 0; i < fWC2TPC.size(); ++i) {
             cet::maybe_ref<recob::Track const> trackWC2TPC(*fWC2TPC.at(i));
@@ -443,6 +445,9 @@ void RecoNNDataEval::analyze(art::Event const &e) {
             WC2TPCPrimaryBeginX = recoWC2TPCBeginning.X();
             WC2TPCPrimaryBeginY = recoWC2TPCBeginning.Y();
             WC2TPCPrimaryBeginZ = recoWC2TPCBeginning.Z();
+
+            // Found valid WC2TPC match
+            WC2TPCsize++;
         } // end trackWC2TPC loop
     } else {
         if (bVerbose) std::cout << "Wire chamber to TPC is NOT valid!" << std::endl;
@@ -680,7 +685,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
         recob::TrackTrajectory::Point_t recoEnd;
 
         // Continue if ID is that of matched beamline particle
-        if (thisTrack->ID() == WC2TPCtrkID) continue;
+        // if (thisTrack->ID() == WC2TPCtrkID) continue;
         if (bVerbose) std::cout << "Looking at track with ID: " << thisTrack->ID() << std::endl;
 
         bool isThisTrackReversed = false;
@@ -914,6 +919,7 @@ void RecoNNDataEval::beginJob() {
     RecoNNDataEvalTree->Branch("obtainedOutsideBoxProbabilities", &obtainedOutsideBoxProbabilities, "obtainedOutsideBoxProbabilities/O");
 
     RecoNNDataEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
+    RecoNNDataEvalTree->Branch("WC2TPCsize", &WC2TPCsize, "WC2TPCsize/I");
     RecoNNDataEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
     RecoNNDataEvalTree->Branch("WC2TPCPrimaryBeginX", &WC2TPCPrimaryBeginX, "WC2TPCPrimaryBeginX/D");
     RecoNNDataEvalTree->Branch("WC2TPCPrimaryBeginY", &WC2TPCPrimaryBeginY, "WC2TPCPrimaryBeginY/D");
@@ -1237,6 +1243,7 @@ void RecoNNDataEval::resetTree() {
     obtainedOutsideBoxProbabilities = false;
 
     WC2TPCtrkID = -99999;
+    WC2TPCsize  = -99999;
 
     WC2TPCLocationsX.clear();
     WC2TPCLocationsY.clear();

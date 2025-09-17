@@ -27,7 +27,7 @@ physics: {
     analyzers: {
         RecoNNDataEval: {
             module_type:              "RecoNNDataEval"
-            Verbose:                  true
+            Verbose:                  false
             WCTrackBuilderLabel:      wctrack
             TPCTrackHandleLabel:      pmtrack
             WC2TPModuleLabel:         wctracktpctrackmatch
