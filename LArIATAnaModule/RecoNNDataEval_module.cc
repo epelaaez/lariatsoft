@@ -268,6 +268,13 @@ class RecoNNDataEval : public art::EDAnalyzer {
         std::vector<double> wcMatchYPos;
         std::vector<double> wcMatchZPos;
 
+        // WC quality checks
+        int wcNumHits;
+        std::vector<double> wcHit0;
+        std::vector<double> wcHit1;
+        std::vector<double> wcHit2;
+        std::vector<double> wcHit3;
+
         // TOF variables
         double tofObject;
         double distanceTraveled;
@@ -401,6 +408,16 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     WCPhi           = wctrack[0]->Phi();
 
     if (bVerbose) std::cout << "WC Track Momentum: " << WCTrackMomentum << std::endl;
+
+    ////////////////////////////////
+    // Data for WC qualtiy filter //
+    ////////////////////////////////
+
+    wcNumHits = wctrack[0]->NHits();
+    wcHit0    = {wctrack[0]->HitPosition(0, 0), wctrack[0]->HitPosition(0, 1), wctrack[0]->HitPosition(0, 2)};
+    wcHit1    = {wctrack[0]->HitPosition(1, 0), wctrack[0]->HitPosition(1, 1), wctrack[0]->HitPosition(1, 2)};
+    wcHit2    = {wctrack[0]->HitPosition(2, 0), wctrack[0]->HitPosition(2, 1), wctrack[0]->HitPosition(2, 2)};
+    wcHit3    = {wctrack[0]->HitPosition(3, 0), wctrack[0]->HitPosition(3, 1), wctrack[0]->HitPosition(3, 2)};
 
     ////////////////
     // TPC tracks //
@@ -999,6 +1016,12 @@ void RecoNNDataEval::beginJob() {
     RecoNNDataEvalTree->Branch("tofObject", &tofObject, "tofObject/D");
     RecoNNDataEvalTree->Branch("distanceTraveled", &distanceTraveled, "distanceTraveled/D");
     RecoNNDataEvalTree->Branch("TOFMass", &TOFMass, "TOFMass/D");
+
+    RecoNNDataEvalTree->Branch("wcNumHits", &wcNumHits, "wcNumHits/I");
+    RecoNNDataEvalTree->Branch("wcHit0", "std::vector<double>", &wcHit0);
+    RecoNNDataEvalTree->Branch("wcHit1", "std::vector<double>", &wcHit1);
+    RecoNNDataEvalTree->Branch("wcHit2", "std::vector<double>", &wcHit2);
+    RecoNNDataEvalTree->Branch("wcHit3", "std::vector<double>", &wcHit3);
 }
 
 double RecoNNDataEval::distance(double x1, double x2, double y1, double y2, double z1, double z2) {
@@ -1294,6 +1317,12 @@ void RecoNNDataEval::resetTree() {
     tofObject        = -1.;
     distanceTraveled = -1.;
     TOFMass          = -1.;
+
+    wcNumHits = -1.;
+    wcHit0.clear();
+    wcHit1.clear();
+    wcHit2.clear();
+    wcHit3.clear();
 }
 
 void RecoNNDataEval::endJob() {
