@@ -46,7 +46,7 @@ outputs:
  out1:
  {
    module_type: RootOutput
-   fileName:    "%ifb_%tc_reco_NNDataProduct_Data.root"
+   fileName:    "%ifb_%tc_reco_NNDataProductData.root"
    dataTier:    "full-reconstructed"
    compressionLevel: 1
  }

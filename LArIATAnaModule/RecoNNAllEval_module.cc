@@ -448,8 +448,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
     if (
         event == 91686 ||
-        event == 91707 || 
-        event == 115702 || 
+        event == 91707 ||
+        event == 115702 ||
         event == 172759 ||
         event == 264599
     ) return; // Bad event, crashes the code for some reason
@@ -499,9 +499,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     for (size_t p = 0; p < plist.size(); ++p) {
         auto part = plist.Particle(p);
         if (part->Process() == "primary") {
-            truthPrimaryPDG = part->PdgCode();
-            truthPrimaryID  = part->TrackId();
-            for (int i = 0; i < part->NumberDaughters(); ++i) primaryDaughtersIDs.push_back(part->Daughter(i));
+            truthPrimaryPDG        = part->PdgCode();
+            truthPrimaryID         = part->TrackId();
             truthPrimaryVertexX    = part->EndX();
             truthPrimaryVertexY    = part->EndY();
             truthPrimaryVertexZ    = part->EndZ(); 
@@ -509,11 +508,17 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             primaryMass            = part->Mass();
             primaryPartID          = part->TrackId();
             truthPrimaryIncidentKE = part->E() - primaryMass;
+            primaryTrajectory      = part->Trajectory();
+
+            for (int i = 0; i < part->NumberDaughters(); ++i) {
+                primaryDaughtersIDs.push_back(part->Daughter(i));
+            }
+
             if (part->NumberTrajectoryPoints() > 1) {
                 vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
                 truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - primaryMass;
             }
-            primaryTrajectory = part->Trajectory();
+
             break;
         }
     }
