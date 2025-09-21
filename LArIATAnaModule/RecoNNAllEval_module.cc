@@ -139,10 +139,10 @@ class RecoNNAllEval : public art::EDAnalyzer {
         unsigned int firstPointInTPC(simb::MCParticle *track);
         unsigned int firstPointInTPC(const art::Ptr<simb::MCParticle> track);
 
-        bool isPosterityOfPrimary(simb::MCParticle *particle, const sim::ParticleList& plist);
         double trackMagnitude(simb::MCParticle *track);
         double trackMagnitude(simb::MCParticle *track, unsigned int cut1, unsigned int cut2);
         double trackMagnitude(const art::Ptr<simb::MCParticle> track, unsigned int cut1, unsigned int cut2);
+        double trackMagnitude(const simb::MCParticle *track);
         bool isWithinActiveVolume(double x, double y, double z);
         bool isWithinReducedVolume(double x, double y, double z);
         bool isWithinReducedVolume(simb::MCParticle *track);
@@ -154,7 +154,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         void fillBackgroundInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
         void initializeProtonPoints(TGraph *gProton);
         void initializePionPoints(TGraph *gPion);
-        double computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints);
+        double computeReducedChi2(const TGraph* theory, const std::vector<double>& xData, const std::vector<double>& yData, int nPoints);
         double energyLossCalculation(double x, double px);
 
     private: 
@@ -267,6 +267,18 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
 
+        // Truth information about multiple primaries
+        int                 numPrimaries;
+        int                 numValidPrimaries;
+        std::vector<double> primariesStartX;
+        std::vector<double> primariesStartY;
+        std::vector<double> primariesStartZ;
+        std::vector<double> primariesEndX;
+        std::vector<double> primariesEndY;
+        std::vector<double> primariesEndZ;
+        std::vector<int>    primariesPDG;
+
+
         // Truth information about interactions in trajectory
         bool        interactionInTrajectory;
         double      trajectoryInitialMomentumX;
@@ -289,10 +301,20 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<double>      truthSecondaryPionDaughtersKE;
 
         // Shower product information for charge exchange events
-        std::vector<int>         chExchShowerIDs;
-        std::vector<std::string> chExchShowerProcesses;
-        std::vector<int>         chExchShowerPDGs;
-        std::vector<double>      chExchShowerLengths;
+        std::vector<int>                 chExchShowerIDs;
+        std::vector<std::string>         chExchShowerProcesses;
+        std::vector<int>                 chExchShowerPDGs;
+        std::vector<double>              chExchShowerLengths;
+        std::vector<std::vector<double>> chExchShowerStart;
+        std::vector<std::vector<double>> chExchShowerEnd;
+
+        // Shower product information for beamline electron events
+        std::vector<int>                 electronShowerIDs;
+        std::vector<std::string>         electronShowerProcesses;
+        std::vector<int>                 electronShowerPDGs;
+        std::vector<double>              electronShowerLengths;
+        std::vector<std::vector<double>> electronShowerStart;
+        std::vector<std::vector<double>> electronShowerEnd;
 
         // WC variables
         int    WC2TPCtrkID;
@@ -492,23 +514,46 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
     // Identify true-level primary particle and get its information
     std::vector<int> primaryDaughtersIDs;
-    TLorentzVector primaryStart, primaryEnd;
     TLorentzVector vertexMomentum;
     simb::MCTrajectory primaryTrajectory;
-    double primaryMass = 0.; int primaryPartID;
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto part = plist.Particle(p);
+    double primaryMass = 0.;
+
+    numPrimaries = plist.NumberOfPrimaries(); numValidPrimaries = 0;
+    if (bVerbose) std::cout << std::endl;
+    if (bVerbose) std::cout << "Number of primaries: " << numPrimaries << std::endl;
+    for (int i = 0; i < numPrimaries; ++i) {
+        const simb::MCParticle* part = plist.Primary(i);
+
         if (part->Process() == "primary") {
-            truthPrimaryPDG        = part->PdgCode();
-            truthPrimaryID         = part->TrackId();
-            truthPrimaryVertexX    = part->EndX();
-            truthPrimaryVertexY    = part->EndY();
-            truthPrimaryVertexZ    = part->EndZ(); 
-            primaryStart           = part->Position(); primaryEnd = part->EndPosition();
-            primaryMass            = part->Mass();
-            primaryPartID          = part->TrackId();
-            truthPrimaryIncidentKE = part->E() - primaryMass;
-            primaryTrajectory      = part->Trajectory();
+            if (bVerbose) std::cout << "  Primary with PDG: " << part->PdgCode() << std::endl;
+            if (bVerbose) std::cout << "      and track ID: " << part->TrackId() << std::endl;
+            if (bVerbose) std::cout << "       and start x: " << part->Position().X() << std::endl;
+            if (bVerbose) std::cout << "       and start y: " << part->Position().Y() << std::endl;
+            if (bVerbose) std::cout << "       and start z: " << part->Position().Z() << std::endl;
+            if (bVerbose) std::cout << "         and end x: " << part->EndPosition().X() << std::endl;
+            if (bVerbose) std::cout << "         and end y: " << part->EndPosition().Y() << std::endl;
+            if (bVerbose) std::cout << "         and end z: " << part->EndPosition().Z() << std::endl;
+
+            primariesPDG.push_back(part->PdgCode());
+            primariesStartX.push_back(part->Position().X());
+            primariesStartY.push_back(part->Position().Y());
+            primariesStartZ.push_back(part->Position().Z());
+            primariesEndX.push_back(part->EndPosition().X());
+            primariesEndY.push_back(part->EndPosition().Y());
+            primariesEndZ.push_back(part->EndPosition().Z());
+
+            // Primary particles generated at beam have start z = -100, while background have start z = -1
+            if (part->Position().Z() != -100) continue;
+            numValidPrimaries++;
+
+            truthPrimaryPDG              = part->PdgCode();
+            truthPrimaryID               = part->TrackId();
+            truthPrimaryVertexX          = part->EndX();
+            truthPrimaryVertexY          = part->EndY();
+            truthPrimaryVertexZ          = part->EndZ(); 
+            primaryMass                  = part->Mass();
+            truthPrimaryIncidentKE       = part->E() - primaryMass;
+            primaryTrajectory            = part->Trajectory();
 
             for (int i = 0; i < part->NumberDaughters(); ++i) {
                 primaryDaughtersIDs.push_back(part->Daughter(i));
@@ -518,10 +563,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 vertexMomentum         = part->Momentum(part->NumberTrajectoryPoints() - 2);
                 truthPrimaryVertexKE   = part->E(part->NumberTrajectoryPoints() - 2) - primaryMass;
             }
-
-            break;
         }
     }
+    if (bVerbose) std::cout << "Number of particles with primary process and valid start z: " << numValidPrimaries << std::endl;
+    if (bVerbose) std::cout << std::endl;
 
     // Get momentum for energy loss
     if (primaryTrajectory.TotalLength() > 1) {
@@ -594,33 +639,29 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     std::vector<int> secondaryPionDaughtersIDs;
     TLorentzVector scatteredPionStart, scatteredPionEnd;
     TLorentzVector outgoingScatterMomentum;
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto part = plist.Particle(p);
-        if (std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end()) {
-            truthPrimaryDaughtersProcess.push_back(part->Process());
-            truthPrimaryDaughtersPDG.push_back(part->PdgCode());
-            truthPrimaryDaughtersID.push_back(part->TrackId());
-            truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
+    for (size_t idxID = 0; idxID < primaryDaughtersIDs.size(); ++idxID) {
+        const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(primaryDaughtersIDs[idxID]);
+        truthPrimaryDaughtersProcess.push_back(part->Process());
+        truthPrimaryDaughtersPDG.push_back(part->PdgCode());
+        truthPrimaryDaughtersID.push_back(part->TrackId());
+        truthPrimaryDaughtersKE.push_back(part->E() - part->Mass());
 
-            // Save information for secondary pions
-            if (part->PdgCode() == -211) {
-                // Get daughters of scattered pion
-                truthScatteredPionLength = trackMagnitude(part);
-                truthScatteredPionKE     = part->E() - part->Mass();
-                for (int i = 0; i < part->NumberDaughters(); ++i) secondaryPionDaughtersIDs.push_back(part->Daughter(i));
-                scatteredPionStart = part->Position(); scatteredPionEnd = part->EndPosition();
-                outgoingScatterMomentum = part->Momentum();
-            }
+        // Save information for secondary pions
+        if (part->PdgCode() == -211) {
+            // Get daughters of scattered pion
+            truthScatteredPionLength = trackMagnitude(part);
+            truthScatteredPionKE     = part->E() - part->Mass();
+            for (int i = 0; i < part->NumberDaughters(); ++i) secondaryPionDaughtersIDs.push_back(part->Daughter(i));
+            scatteredPionStart = part->Position(); scatteredPionEnd = part->EndPosition();
+            outgoingScatterMomentum = part->Momentum();
         }
     }
 
-    for (size_t p = 0; p < plist.size(); ++p) {
-        auto part = plist.Particle(p);
-        if (std::find(secondaryPionDaughtersIDs.begin(), secondaryPionDaughtersIDs.end(), part->TrackId()) != secondaryPionDaughtersIDs.end()) {
-            truthSecondaryPionDaughtersPDG.push_back(part->PdgCode());
-            truthSecondaryPionDaughtersProcess.push_back(part->Process());
-            truthSecondaryPionDaughtersKE.push_back(part->E() - part->Mass());
-        }
+    for (size_t idxID = 0; idxID < secondaryPionDaughtersIDs.size(); ++idxID) {
+        const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(secondaryPionDaughtersIDs[idxID]);
+        truthSecondaryPionDaughtersPDG.push_back(part->PdgCode());
+        truthSecondaryPionDaughtersProcess.push_back(part->Process());
+        truthSecondaryPionDaughtersKE.push_back(part->E() - part->Mass());
     }
 
     truthScatteringAngle  = vertexMomentum.Angle(outgoingScatterMomentum.Vect());
@@ -655,39 +696,100 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     ////////////////////////////////////////////////////
 
     if (backgroundType == 7) {
-        for (size_t p = 0; p < plist.size(); ++p) {
-            auto part = plist.Particle(p);
-            if (
-                std::find(primaryDaughtersIDs.begin(), primaryDaughtersIDs.end(), part->TrackId()) != primaryDaughtersIDs.end() &&
-                part->PdgCode() == 111
-            ) {
+        for (size_t idxID = 0; idxID < primaryDaughtersIDs.size(); ++idxID) {
+            const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(primaryDaughtersIDs[idxID]);
+
+            if (part->PdgCode() == 111) {
                 // Found neutral pion from charge exchange
                 chExchShowerIDs.push_back(part->TrackId());
                 chExchShowerProcesses.push_back(part->Process());
                 chExchShowerPDGs.push_back(part->PdgCode());
                 chExchShowerLengths.push_back(trackMagnitude(part));
 
-                // Recursively collect all electrons and photons from the shower
+                // Recursively collect all electrons, positrons and photons from the shower
                 std::function<void(int)> collectShowerParticles = [&](int trackId) {
-                    for (size_t pidx = 0; pidx < plist.size(); ++pidx) {
-                        auto showerPart = plist.Particle(pidx);
-                        if (showerPart->Mother() == trackId) {
-                            int pdg = showerPart->PdgCode();
+                    const simb::MCParticle* parent = pi_serv->TrackIdToParticle_P(trackId);
 
-                            // Photons, electrons, positrons
-                            if (
-                                (pdg == 22 || pdg == 11 || pdg == -11) &&
-                                isWithinActiveVolume(showerPart->EndX(), showerPart->EndY(), showerPart->EndZ())
-                            ) {
-                                chExchShowerIDs.push_back(showerPart->TrackId());
-                                chExchShowerProcesses.push_back(showerPart->Process());
-                                chExchShowerPDGs.push_back(showerPart->PdgCode());
-                                chExchShowerLengths.push_back(trackMagnitude(showerPart));
-                            }
+                    const int nDau = parent->NumberDaughters();
+                    for (int i = 0; i < nDau; ++i) {
+                        const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(parent->Daughter(i));;
 
-                            // Continue recursion for all daughters
-                            collectShowerParticles(showerPart->TrackId());
+                        int                 pdg = child->PdgCode();
+                        double showerPartLength = trackMagnitude(child);
+
+                        // Photons, electrons, positrons
+                        if (
+                            (pdg == 11 || pdg == -11) &&
+                            isWithinActiveVolume(child->Position().X(), child->Position().Y(), child->Position().Z()) &&
+                            showerPartLength > 0.4
+                        ) {
+                            chExchShowerIDs.push_back(child->TrackId());
+                            chExchShowerProcesses.push_back(child->Process());
+                            chExchShowerPDGs.push_back(child->PdgCode());
+                            chExchShowerLengths.push_back(showerPartLength);
+
+                            chExchShowerStart.push_back({child->Position().X(), child->Position().Y(), child->Position().Z()});
+                            chExchShowerEnd.push_back({child->EndPosition().X(), child->EndPosition().Y(), child->EndPosition().Z()});
                         }
+
+                        // Continue recursion for all daughters
+                        collectShowerParticles(child->TrackId());
+                    }
+                };
+
+                // Start recursion from each direct daughter of the neutral pion
+                collectShowerParticles(part->TrackId());
+                for (int i = 0; i < part->NumberDaughters(); ++i) {
+                    collectShowerParticles(part->Daughter(i));
+                }
+
+                break;
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////
+    // Extra information about beamline electrons //
+    ////////////////////////////////////////////////
+
+    if (backgroundType == 3) {
+        for (int i = 0; i < numPrimaries; ++i) {
+            const simb::MCParticle* part = plist.Primary(i);
+            if (part->PdgCode() == 11 || part->Process() == "primary") {
+                // Add electron to lists
+                electronShowerIDs.push_back(part->TrackId());
+                electronShowerProcesses.push_back(part->Process());
+                electronShowerPDGs.push_back(part->PdgCode());
+                electronShowerLengths.push_back(trackMagnitude(part));
+
+                // Recursively collect all electrons, positrons and photons from the shower
+                std::function<void(int)> collectShowerParticles = [&](int trackId) {
+                    const simb::MCParticle* parent = pi_serv->TrackIdToParticle_P(trackId);
+
+                    const int nDau = parent->NumberDaughters();
+                    for (int i = 0; i < nDau; ++i) {
+                        const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(parent->Daughter(i));;
+
+                        int                 pdg = child->PdgCode();
+                        double showerPartLength = trackMagnitude(child);
+
+                        // Photons, electrons, positrons
+                        if (
+                            (pdg == 11 || pdg == -11) &&
+                            isWithinActiveVolume(child->Position().X(), child->Position().Y(), child->Position().Z()) &&
+                            showerPartLength > 0.4
+                        ) {
+                            electronShowerIDs.push_back(child->TrackId());
+                            electronShowerProcesses.push_back(child->Process());
+                            electronShowerPDGs.push_back(child->PdgCode());
+                            electronShowerLengths.push_back(showerPartLength);
+
+                            electronShowerStart.push_back({child->Position().X(), child->Position().Y(), child->Position().Z()});
+                            electronShowerEnd.push_back({child->EndPosition().X(), child->EndPosition().Y(), child->EndPosition().Z()});
+                        }
+
+                        // Continue recursion for all daughters
+                        collectShowerParticles(child->TrackId());
                     }
                 };
 
@@ -710,7 +812,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     art::ServiceHandle<geo::Geometry> geom;
     art::ServiceHandle<cheat::BackTrackerService> bt;
     geo::View_t view = geom->View(0);
-    auto simIDE_Prim = bt->TrackIdToSimIDEs_Ps(primaryPartID, view);
+    auto simIDE_Prim = bt->TrackIdToSimIDEs_Ps(truthPrimaryID, view);
     std::map<double, sim::IDE> orderedSimIDE;
     for (auto ide : simIDE_Prim) orderedSimIDE[ide->z] = *ide;
 
@@ -964,12 +1066,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 std::vector<int> daughterIDs;
                 for (int i = 0; i < particle->NumberDaughters(); ++i) daughterIDs.push_back(particle->Daughter(i));
 
-                for (size_t p = 0; p < plist.size(); ++p) {
-                    auto part = plist.Particle(p);
-                    if (std::find(daughterIDs.begin(), daughterIDs.end(), part->TrackId()) != daughterIDs.end()) {
-                        wcMatchDaughtersProcess.push_back(part->Process());
-                        wcMatchDaughtersPDG.push_back(part->PdgCode());
-                    }
+                for (size_t idxID = 0; idxID < daughterIDs.size(); ++idxID) {
+                    const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(daughterIDs[idxID]);
+                    wcMatchDaughtersProcess.push_back(part->Process());
+                    wcMatchDaughtersPDG.push_back(part->PdgCode());
                 }
                 break;
             }
@@ -991,7 +1091,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
     if (HitsInTrack.isValid() && WC2TPCtrackIndex != -1 && WC2TPCtrkID != -99999) {
         int lowest_hit = -1;
-        std::vector<art::Ptr<recob::Hit>> trackhits = HitsInTrack.at(WC2TPCtrackIndex);
+        auto const& trackhits = HitsInTrack.at(WC2TPCtrackIndex);
         for (size_t iHit = 0; iHit < trackhits.size(); ++iHit) {
             if (trackhits[iHit]->View() != 1) continue;
             if (lowest_hit == -1) lowest_hit = iHit;
@@ -1453,7 +1553,7 @@ void RecoNNAllEval::beginJob() {
 
     RecoNNAllEvalTree->Branch("matchedBeginX", "std::vector<double>", &matchedBeginX);
     RecoNNAllEvalTree->Branch("matchedBeginY", "std::vector<double>", &matchedBeginY);
-    RecoNNAllEvalTree->Branch("matchedBeginY", "std::vector<double>", &matchedBeginY);
+    RecoNNAllEvalTree->Branch("matchedBeginZ", "std::vector<double>", &matchedBeginZ);
     RecoNNAllEvalTree->Branch("matchedEndX", "std::vector<double>", &matchedEndX);
     RecoNNAllEvalTree->Branch("matchedEndY", "std::vector<double>", &matchedEndY);
     RecoNNAllEvalTree->Branch("matchedEndZ", "std::vector<double>", &matchedEndZ);
@@ -1489,7 +1589,7 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("numTaggedAsProton", &numTaggedAsProton, "numTaggedAsProton/I");
     RecoNNAllEvalTree->Branch("numNotTagged", &numNotTagged, "numTaggenumNotTaggeddAsPions/I");
 
-    RecoNNAllEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
+    // RecoNNAllEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
     RecoNNAllEvalTree->Branch("fHitKey", "std::vector<int>", &fHitKey);
     RecoNNAllEvalTree->Branch("fHitPlane", "std::vector<int>", &fHitPlane);
     RecoNNAllEvalTree->Branch("fHitT", "std::vector<float>", &fHitT);
@@ -1521,6 +1621,25 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("chExchShowerProcesses", "std::vector<std::string>", &chExchShowerProcesses);
     RecoNNAllEvalTree->Branch("chExchShowerPDGs", "std::vector<int>", &chExchShowerPDGs);
     RecoNNAllEvalTree->Branch("chExchShowerLengths", "std::vector<double>", &chExchShowerLengths);
+    RecoNNAllEvalTree->Branch("chExchShowerStart", "std::vector<std::vector<double>>", &chExchShowerStart);
+    RecoNNAllEvalTree->Branch("chExchShowerEnd", "std::vector<std::vector<double>>", &chExchShowerEnd);
+
+    RecoNNAllEvalTree->Branch("electronShowerIDs", "std::vector<int>", &electronShowerIDs);
+    RecoNNAllEvalTree->Branch("electronShowerProcesses", "std::vector<std::string>", &electronShowerProcesses);
+    RecoNNAllEvalTree->Branch("electronShowerPDGs", "std::vector<int>", &electronShowerPDGs);
+    RecoNNAllEvalTree->Branch("electronShowerLengths", "std::vector<double>", &electronShowerLengths);
+    RecoNNAllEvalTree->Branch("electronShowerStart", "std::vector<std::vector<double>>", &electronShowerStart);
+    RecoNNAllEvalTree->Branch("electronShowerEnd", "std::vector<std::vector<double>>", &electronShowerEnd);
+
+    RecoNNAllEvalTree->Branch("numPrimaries", &numPrimaries, "numPrimaries/I");
+    RecoNNAllEvalTree->Branch("numValidPrimaries", &numValidPrimaries, "numValidPrimaries/I");
+    RecoNNAllEvalTree->Branch("primariesPDG", "std::vector<int>", &primariesPDG);
+    RecoNNAllEvalTree->Branch("primariesStartX", "std::vector<double>", &primariesStartX);
+    RecoNNAllEvalTree->Branch("primariesStartY", "std::vector<double>", &primariesStartY);
+    RecoNNAllEvalTree->Branch("primariesStartZ", "std::vector<double>", &primariesStartZ);
+    RecoNNAllEvalTree->Branch("primariesEndX", "std::vector<double>", &primariesEndX);
+    RecoNNAllEvalTree->Branch("primariesEndY", "std::vector<double>", &primariesEndY);
+    RecoNNAllEvalTree->Branch("primariesEndZ", "std::vector<double>", &primariesEndZ);
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -1567,29 +1686,6 @@ unsigned int RecoNNAllEval::firstPointInTPC(const art::Ptr<simb::MCParticle> tra
   return 9999;
 }
 
-bool RecoNNAllEval::isPosterityOfPrimary(simb::MCParticle *particle, const sim::ParticleList& plist) {
-    int motherTrackID = particle->Mother();
-    int motherPosition = -1;
-    for (size_t p = 0; p < plist.size(); ++p) {
-        if (plist.Particle(p)->TrackId() == motherTrackID) motherPosition = p;
-    }
-
-    // Return false if no mother found/mother outside of scope
-    if ((motherTrackID == -1) || (motherPosition == -1)) return false;
-
-    // Check if we have reached primary particle
-    if (plist.Particle(motherPosition)->Process() == "primary") {
-        if (plist.Particle(motherPosition)->PdgCode() == -211) {
-            return true; // Recursion reached primary pion, so proton is in pion's family tree
-        } else {
-            return false; // Recursion did not reach primary pion
-        }
-    }
-
-    // Recursion for mother
-    return isPosterityOfPrimary(plist.Particle(motherPosition), plist);
-}
-
 double RecoNNAllEval::distance(double x1, double x2, double y1, double y2, double z1, double z2) {
     return sqrt(
         pow(x1 - x2, 2) + pow(y1 - y2, 2) + pow(z1 - z2, 2)
@@ -1613,6 +1709,14 @@ double RecoNNAllEval::trackMagnitude(simb::MCParticle *track, unsigned int cut1,
 }
 
 double RecoNNAllEval::trackMagnitude(simb::MCParticle *track) {
+  return sqrt(
+    pow(track->EndX()-track->Vx(0),2) + 
+    pow(track->EndY()-track->Vy(0),2) + 
+    pow(track->EndZ()-track->Vz(0),2)
+  );
+}
+
+double RecoNNAllEval::trackMagnitude(const simb::MCParticle *track) {
   return sqrt(
     pow(track->EndX()-track->Vx(0),2) + 
     pow(track->EndY()-track->Vy(0),2) + 
@@ -1816,14 +1920,13 @@ double RecoNNAllEval::meanDEDX(
     std::vector<double>& trackYPos,
     std::vector<double>& trackZPos
 ) {
-    // Temporary storage for this reco track
-    // std::vector<double> recoPitch_v; 
-    std::vector<double> recoDEDX_v;
-    std::vector<double> recoEDep_v;
-    std::vector<double> recoResR_v;
-    std::vector<double> recoXPos_v;
-    std::vector<double> recoYPos_v;
-    std::vector<double> recoZPos_v;
+    // Clean output vectors before writing
+    trackDEDX.clear();
+    trackResR.clear();
+    trackEDep.clear();
+    trackXPos.clear();
+    trackYPos.clear();
+    trackZPos.clear();
 
     if (fmcal.isValid()) {
         // Get calorimetry for this track
@@ -1845,23 +1948,23 @@ double RecoNNAllEval::meanDEDX(
                 if (!isWithinActiveVolume(calos[j]->XYZ()[k].X(), calos[j]->XYZ()[k].Y(), calos[j]->XYZ()[k].Z())) continue;
 
                 // recoPitch_v.push_back(calos[j]->TrkPitchVec()[k]);
-                recoDEDX_v.push_back(calos[j]->dEdx()[k]);
-                recoEDep_v.push_back(calos[j]->dEdx()[k] * calos[j]->TrkPitchVec()[k]);
-                recoResR_v.push_back(calos[j]->ResidualRange()[k]);
-                recoXPos_v.push_back(calos[j]->XYZ()[k].X());
-                recoYPos_v.push_back(calos[j]->XYZ()[k].Y());
-                recoZPos_v.push_back(calos[j]->XYZ()[k].Z());
+                trackDEDX.push_back(calos[j]->dEdx()[k]);
+                trackEDep.push_back(calos[j]->dEdx()[k] * calos[j]->TrkPitchVec()[k]);
+                trackResR.push_back(calos[j]->ResidualRange()[k]);
+                trackXPos.push_back(calos[j]->XYZ()[k].X());
+                trackYPos.push_back(calos[j]->XYZ()[k].Y());
+                trackZPos.push_back(calos[j]->XYZ()[k].Z());
             } // end loop on calo points
 
             if (bVerbose) std::cout << "Filled calorimetry vectors" << std::endl;
             if (isThisTrackReversed) {
                 // std::reverse(recoPitch_v.begin(), recoPitch_v.end());
-                std::reverse(recoResR_v.begin(), recoResR_v.end());
-                std::reverse(recoDEDX_v.begin(), recoDEDX_v.end());
-                std::reverse(recoEDep_v.begin(), recoEDep_v.end());
-                std::reverse(recoXPos_v.begin(), recoXPos_v.end());
-                std::reverse(recoYPos_v.begin(), recoYPos_v.end());
-                std::reverse(recoZPos_v.begin(), recoZPos_v.end());
+                std::reverse(trackResR.begin(), trackResR.end());
+                std::reverse(trackDEDX.begin(), trackDEDX.end());
+                std::reverse(trackEDep.begin(), trackEDep.end());
+                std::reverse(trackXPos.begin(), trackXPos.end());
+                std::reverse(trackYPos.begin(), trackYPos.end());
+                std::reverse(trackZPos.begin(), trackZPos.end());
             }
         } // end loop over planes
     }
@@ -1869,21 +1972,14 @@ double RecoNNAllEval::meanDEDX(
     // Compute and save mean dedx
     double meanDEDX = 0;
     unsigned int bound = MeanDEDXNumberTrajPoints;
-    if (MeanDEDXNumberTrajPoints > recoDEDX_v.size()) bound = recoDEDX_v.size();
-    for (unsigned int i = 0; i < bound; ++i) meanDEDX += recoDEDX_v.at(i);
+    if (MeanDEDXNumberTrajPoints > trackDEDX.size()) bound = trackDEDX.size();
+    for (unsigned int i = 0; i < bound; ++i) meanDEDX += trackDEDX.at(i);
     if (bound != 0) meanDEDX /= bound;
-
-    trackDEDX = recoDEDX_v;
-    trackResR = recoResR_v;
-    trackEDep = recoEDep_v;
-    trackXPos = recoXPos_v;
-    trackYPos = recoYPos_v;
-    trackZPos = recoZPos_v;
     
     return meanDEDX;
 }
 
-double RecoNNAllEval::computeReducedChi2(const TGraph* theory, std::vector<double> xData, std::vector<double> yData, int nPoints) {
+double RecoNNAllEval::computeReducedChi2(const TGraph* theory, const std::vector<double>& xData, const std::vector<double>& yData, int nPoints) {
     double chi2 = 0.0;
 
     for (int i = 0; i < nPoints; ++i) {
@@ -2100,6 +2196,21 @@ void RecoNNAllEval::resetTree() {
     chExchShowerProcesses.clear();
     chExchShowerPDGs.clear();
     chExchShowerLengths.clear();
+
+    electronShowerIDs.clear();
+    electronShowerProcesses.clear();
+    electronShowerPDGs.clear();
+    electronShowerLengths.clear();
+
+    numPrimaries      = 0;
+    numValidPrimaries = 0;
+    primariesStartX.clear();
+    primariesStartY.clear();
+    primariesStartZ.clear();
+    primariesEndX.clear();
+    primariesEndY.clear();
+    primariesEndZ.clear();
+    primariesPDG.clear();
 }
 
 void RecoNNAllEval::endJob() {
