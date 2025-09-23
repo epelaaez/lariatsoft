@@ -277,7 +277,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<double> primariesEndY;
         std::vector<double> primariesEndZ;
         std::vector<int>    primariesPDG;
-
+        std::vector<int>    primariesID;
 
         // Truth information about interactions in trajectory
         bool        interactionInTrajectory;
@@ -513,7 +513,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     size_t nWireHits = fHitlist.size();
 
     // Identify true-level primary particle and get its information
-    std::vector<int> primaryDaughtersIDs;
+    std::vector<int> primaryDaughtersIDs; int validPrimaryIdx = -1;
     TLorentzVector vertexMomentum;
     simb::MCTrajectory primaryTrajectory;
     double primaryMass = 0.;
@@ -534,17 +534,37 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             if (bVerbose) std::cout << "         and end y: " << part->EndPosition().Y() << std::endl;
             if (bVerbose) std::cout << "         and end z: " << part->EndPosition().Z() << std::endl;
 
+            primariesID.push_back(part->TrackId());
             primariesPDG.push_back(part->PdgCode());
-            primariesStartX.push_back(part->Position().X());
-            primariesStartY.push_back(part->Position().Y());
-            primariesStartZ.push_back(part->Position().Z());
-            primariesEndX.push_back(part->EndPosition().X());
-            primariesEndY.push_back(part->EndPosition().Y());
-            primariesEndZ.push_back(part->EndPosition().Z());
+
+            unsigned int firstInTPC = firstPointInTPC(const_cast<simb::MCParticle*>(part));
+            unsigned int lastInTPC  = lastPointInTPC(const_cast<simb::MCParticle*>(part));
+
+            if (firstInTPC != 9999) {
+                primariesStartX.push_back(part->Vx(firstInTPC));
+                primariesStartY.push_back(part->Vy(firstInTPC));
+                primariesStartZ.push_back(part->Vz(firstInTPC));
+            } else {
+                primariesStartX.push_back(part->Position().X());
+                primariesStartY.push_back(part->Position().Y());
+                primariesStartZ.push_back(part->Position().Z());
+            }
+
+            if (lastInTPC != 9999) {
+                primariesEndX.push_back(part->Vx(lastInTPC));
+                primariesEndY.push_back(part->Vx(lastInTPC));
+                primariesEndZ.push_back(part->Vx(lastInTPC));
+            } else {
+                primariesEndX.push_back(part->EndPosition().X());
+                primariesEndY.push_back(part->EndPosition().Y());
+                primariesEndZ.push_back(part->EndPosition().Z());
+            }
 
             // Primary particles generated at beam have start z = -100, while background have start z = -1
+            // I already check and all events only have one valid event, so setting validPrimaryIdx here 
+            // should be safe
             if (part->Position().Z() != -100) continue;
-            numValidPrimaries++;
+            numValidPrimaries++; validPrimaryIdx = i;
 
             truthPrimaryPDG              = part->PdgCode();
             truthPrimaryID               = part->TrackId();
@@ -695,54 +715,94 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     // Extra information about charge exchange events //
     ////////////////////////////////////////////////////
 
+    // Helper functions to recursively collect all electrons and positrons
+    std::function<void(
+        int,
+        std::vector<int>&,
+        std::vector<std::string>&,
+        std::vector<int>&,
+        std::vector<double>&,
+        std::vector<std::vector<double>>&,
+    std::vector<std::vector<double>>&
+    )> collectShowerParticles;
+
+    collectShowerParticles =
+    [&](int trackId,
+        std::vector<int>& ids,
+        std::vector<std::string>& processes,
+        std::vector<int>& pdgs,
+        std::vector<double>& lengths,
+        std::vector<std::vector<double>>& starts,
+        std::vector<std::vector<double>>& ends
+    ) {
+        const simb::MCParticle* parent = pi_serv->TrackIdToParticle_P(trackId);
+
+        const int nDau = parent->NumberDaughters();
+        for (int i = 0; i < nDau; ++i) {
+            const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(parent->Daughter(i));
+            int    pdg                    = child->PdgCode();
+            double showerPartLength       = trackMagnitude(child);
+
+            // Photons, electrons, positrons
+            if (
+                (pdg == 11 || pdg == -11 || pdg == 22) &&
+                isWithinActiveVolume(child->Position().X(), child->Position().Y(), child->Position().Z()) &&
+                showerPartLength > 0.4
+            ) {
+                ids.push_back(child->TrackId());
+                processes.push_back(child->Process());
+                pdgs.push_back(child->PdgCode());
+                lengths.push_back(showerPartLength);
+
+                unsigned int firstInTPC = firstPointInTPC(const_cast<simb::MCParticle*>(child));
+                unsigned int lastInTPC  = lastPointInTPC(const_cast<simb::MCParticle*>(child));
+                if (firstInTPC != 9999 && lastInTPC != 9999) {
+                    starts.push_back({child->Vx(firstInTPC), child->Vy(firstInTPC), child->Vz(firstInTPC)});
+                    ends.push_back({child->Vx(lastInTPC), child->Vy(lastInTPC), child->Vz(lastInTPC)});
+                } else {
+                    starts.push_back({child->Position().X(), child->Position().Y(), child->Position().Z()});
+                    ends.push_back({child->EndPosition().X(), child->EndPosition().Y(), child->EndPosition().Z()});
+                }
+            }
+
+            // Continue recursion for all daughters
+            collectShowerParticles(
+                child->TrackId(),
+                ids,
+                processes,
+                pdgs,
+                lengths,
+                starts,
+                ends
+            );
+        }
+    };
+
     if (backgroundType == 7) {
         for (size_t idxID = 0; idxID < primaryDaughtersIDs.size(); ++idxID) {
             const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(primaryDaughtersIDs[idxID]);
 
+            // Here we want to start collecting particles at the neutral pion, since some of the reco
+            // tracks are going to match to this truth particle and we want to capture that
             if (part->PdgCode() == 111) {
                 // Found neutral pion from charge exchange
                 chExchShowerIDs.push_back(part->TrackId());
                 chExchShowerProcesses.push_back(part->Process());
                 chExchShowerPDGs.push_back(part->PdgCode());
                 chExchShowerLengths.push_back(trackMagnitude(part));
-
-                // Recursively collect all electrons, positrons and photons from the shower
-                std::function<void(int)> collectShowerParticles = [&](int trackId) {
-                    const simb::MCParticle* parent = pi_serv->TrackIdToParticle_P(trackId);
-
-                    const int nDau = parent->NumberDaughters();
-                    for (int i = 0; i < nDau; ++i) {
-                        const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(parent->Daughter(i));;
-
-                        int                 pdg = child->PdgCode();
-                        double showerPartLength = trackMagnitude(child);
-
-                        // Photons, electrons, positrons
-                        if (
-                            (pdg == 11 || pdg == -11) &&
-                            isWithinActiveVolume(child->Position().X(), child->Position().Y(), child->Position().Z()) &&
-                            showerPartLength > 0.4
-                        ) {
-                            chExchShowerIDs.push_back(child->TrackId());
-                            chExchShowerProcesses.push_back(child->Process());
-                            chExchShowerPDGs.push_back(child->PdgCode());
-                            chExchShowerLengths.push_back(showerPartLength);
-
-                            chExchShowerStart.push_back({child->Position().X(), child->Position().Y(), child->Position().Z()});
-                            chExchShowerEnd.push_back({child->EndPosition().X(), child->EndPosition().Y(), child->EndPosition().Z()});
-                        }
-
-                        // Continue recursion for all daughters
-                        collectShowerParticles(child->TrackId());
-                    }
-                };
+                chExchShowerStart.push_back({part->Position().X(), part->Position().Y(), part->Position().Z()});
+                chExchShowerEnd.push_back({part->EndPosition().X(), part->EndPosition().Y(), part->EndPosition().Z()});
 
                 // Start recursion from each direct daughter of the neutral pion
-                collectShowerParticles(part->TrackId());
-                for (int i = 0; i < part->NumberDaughters(); ++i) {
-                    collectShowerParticles(part->Daughter(i));
-                }
-
+                collectShowerParticles(
+                    part->TrackId(),
+                    chExchShowerIDs,
+                    chExchShowerProcesses,
+                    chExchShowerPDGs,
+                    chExchShowerLengths,
+                    chExchShowerStart,
+                    chExchShowerEnd
+                );
                 break;
             }
         }
@@ -753,55 +813,32 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     ////////////////////////////////////////////////
 
     if (backgroundType == 3) {
-        for (int i = 0; i < numPrimaries; ++i) {
-            const simb::MCParticle* part = plist.Primary(i);
-            if (part->PdgCode() == 11 || part->Process() == "primary") {
-                // Add electron to lists
-                electronShowerIDs.push_back(part->TrackId());
-                electronShowerProcesses.push_back(part->Process());
-                electronShowerPDGs.push_back(part->PdgCode());
-                electronShowerLengths.push_back(trackMagnitude(part));
-
-                // Recursively collect all electrons, positrons and photons from the shower
-                std::function<void(int)> collectShowerParticles = [&](int trackId) {
-                    const simb::MCParticle* parent = pi_serv->TrackIdToParticle_P(trackId);
-
-                    const int nDau = parent->NumberDaughters();
-                    for (int i = 0; i < nDau; ++i) {
-                        const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(parent->Daughter(i));;
-
-                        int                 pdg = child->PdgCode();
-                        double showerPartLength = trackMagnitude(child);
-
-                        // Photons, electrons, positrons
-                        if (
-                            (pdg == 11 || pdg == -11) &&
-                            isWithinActiveVolume(child->Position().X(), child->Position().Y(), child->Position().Z()) &&
-                            showerPartLength > 0.4
-                        ) {
-                            electronShowerIDs.push_back(child->TrackId());
-                            electronShowerProcesses.push_back(child->Process());
-                            electronShowerPDGs.push_back(child->PdgCode());
-                            electronShowerLengths.push_back(showerPartLength);
-
-                            electronShowerStart.push_back({child->Position().X(), child->Position().Y(), child->Position().Z()});
-                            electronShowerEnd.push_back({child->EndPosition().X(), child->EndPosition().Y(), child->EndPosition().Z()});
-                        }
-
-                        // Continue recursion for all daughters
-                        collectShowerParticles(child->TrackId());
-                    }
-                };
-
-                // Start recursion from each direct daughter of the neutral pion
-                collectShowerParticles(part->TrackId());
-                for (int i = 0; i < part->NumberDaughters(); ++i) {
-                    collectShowerParticles(part->Daughter(i));
-                }
-
-                break;
-            }
+        // Here, we can start the tree with the electron, because everything should start from there
+        // and truth match to one of its daughters
+        const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(primariesID[validPrimaryIdx]);
+        
+        if (part->PdgCode() != 11) {
+            throw std::runtime_error("Expected electron (pdg = 11)");
         }
+
+        // Add electron to lists
+        electronShowerIDs.push_back(part->TrackId());
+        electronShowerProcesses.push_back(part->Process());
+        electronShowerPDGs.push_back(part->PdgCode());
+        electronShowerLengths.push_back(trackMagnitude(part));
+        electronShowerStart.push_back({part->Position().X(), part->Position().Y(), part->Position().Z()});
+        electronShowerEnd.push_back({part->EndPosition().X(), part->EndPosition().Y(), part->EndPosition().Z()});
+
+        // Start recursion from each direct daughter of the neutral pion
+        collectShowerParticles(
+            part->TrackId(),
+            electronShowerIDs,
+            electronShowerProcesses,
+            electronShowerPDGs,
+            electronShowerLengths,
+            electronShowerStart,
+            electronShowerEnd
+        );
     }
 
     /////////////////////////////////////////////////
@@ -1634,6 +1671,7 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("numPrimaries", &numPrimaries, "numPrimaries/I");
     RecoNNAllEvalTree->Branch("numValidPrimaries", &numValidPrimaries, "numValidPrimaries/I");
     RecoNNAllEvalTree->Branch("primariesPDG", "std::vector<int>", &primariesPDG);
+    RecoNNAllEvalTree->Branch("primariesID", "std::vector<int>", &primariesID);
     RecoNNAllEvalTree->Branch("primariesStartX", "std::vector<double>", &primariesStartX);
     RecoNNAllEvalTree->Branch("primariesStartY", "std::vector<double>", &primariesStartY);
     RecoNNAllEvalTree->Branch("primariesStartZ", "std::vector<double>", &primariesStartZ);
@@ -2196,11 +2234,15 @@ void RecoNNAllEval::resetTree() {
     chExchShowerProcesses.clear();
     chExchShowerPDGs.clear();
     chExchShowerLengths.clear();
+    chExchShowerStart.clear();
+    chExchShowerEnd.clear();
 
     electronShowerIDs.clear();
     electronShowerProcesses.clear();
     electronShowerPDGs.clear();
     electronShowerLengths.clear();
+    electronShowerStart.clear();
+    electronShowerEnd.clear();
 
     numPrimaries      = 0;
     numValidPrimaries = 0;
@@ -2211,6 +2253,7 @@ void RecoNNAllEval::resetTree() {
     primariesEndY.clear();
     primariesEndZ.clear();
     primariesPDG.clear();
+    primariesID.clear();
 }
 
 void RecoNNAllEval::endJob() {
