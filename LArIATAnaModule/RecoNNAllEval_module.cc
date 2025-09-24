@@ -266,6 +266,9 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<int>         truthPrimaryDaughtersPDG;
         std::vector<std::string> truthPrimaryDaughtersProcess;
         std::vector<double>      truthPrimaryDaughtersKE;
+        std::vector<double>      truthPrimaryLocationX;
+        std::vector<double>      truthPrimaryLocationY;
+        std::vector<double>      truthPrimaryLocationZ;
 
         // Truth information about multiple primaries
         int                 numPrimaries;
@@ -301,6 +304,9 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<double>      truthSecondaryPionDaughtersKE;
 
         // Shower product information for charge exchange events
+        int                              chExchShowerNeutralPionID;
+        std::vector<int>                 chExchShowerNeutralPionDaughtersID;
+        std::vector<std::vector<double>> chExchShowerNeutralPionDaughtersMom;
         std::vector<int>                 chExchShowerIDs;
         std::vector<std::string>         chExchShowerProcesses;
         std::vector<int>                 chExchShowerPDGs;
@@ -625,6 +631,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             trajectoryInteractionY = interactionPosition.Y();
             trajectoryInteractionZ = interactionPosition.Z();
 
+            truthPrimaryLocationX.push_back(trajectoryInteractionX);
+            truthPrimaryLocationY.push_back(trajectoryInteractionY);
+            truthPrimaryLocationZ.push_back(trajectoryInteractionZ);
+
             trajectoryInteractionKE = primaryTrajectory.E(couple.first) - primaryMass;
             
             // Get momentum before and after interaction
@@ -740,8 +750,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         const int nDau = parent->NumberDaughters();
         for (int i = 0; i < nDau; ++i) {
             const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(parent->Daughter(i));
-            int    pdg                    = child->PdgCode();
-            double showerPartLength       = trackMagnitude(child);
+            int    pdg              = child->PdgCode();
+            double showerPartLength = trackMagnitude(child);
 
             // Photons, electrons, positrons
             if (
@@ -786,12 +796,33 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             // tracks are going to match to this truth particle and we want to capture that
             if (part->PdgCode() == 111) {
                 // Found neutral pion from charge exchange
+                chExchShowerNeutralPionID = part->TrackId();
                 chExchShowerIDs.push_back(part->TrackId());
                 chExchShowerProcesses.push_back(part->Process());
                 chExchShowerPDGs.push_back(part->PdgCode());
                 chExchShowerLengths.push_back(trackMagnitude(part));
                 chExchShowerStart.push_back({part->Position().X(), part->Position().Y(), part->Position().Z()});
                 chExchShowerEnd.push_back({part->EndPosition().X(), part->EndPosition().Y(), part->EndPosition().Z()});
+
+                // Find first two photons
+                int countPhotons = 0;
+                if (bVerbose) std::cout << "Looking at daughters of neutral pion in ch. exch. event: " << std::endl;
+                const int nDau = part->NumberDaughters();
+                for (int i = 0; i < nDau; ++i) {
+                    const simb::MCParticle* child = pi_serv->TrackIdToParticle_P(part->Daughter(i));
+                    if (bVerbose) std::cout << "  PDG: " << child->PdgCode() << std::endl;
+                    if (bVerbose) std::cout << "  Process: " << child->Process() << std::endl;
+
+                    chExchShowerNeutralPionDaughtersID.push_back(child->TrackId());
+                    chExchShowerNeutralPionDaughtersMom.push_back({
+                        child->Px(0), child->Py(0), child->Pz(0)
+                    });
+                    
+                    if (child->PdgCode() == 22) countPhotons++;
+                }
+                if (countPhotons > 2) {
+                    throw std::runtime_error("Expected at most 2 photons from neutral pion decay");
+                }
 
                 // Start recursion from each direct daughter of the neutral pion
                 collectShowerParticles(
@@ -1532,6 +1563,10 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("truthSecondaryPionDaughtersProcess", "std::vector<std::string>", &truthSecondaryPionDaughtersProcess); 
     RecoNNAllEvalTree->Branch("truthSecondaryPionDaughtersKE", "std::vector<double>", &truthSecondaryPionDaughtersKE); 
 
+    RecoNNAllEvalTree->Branch("truthPrimaryLocationX", "std::vector<double>", &truthPrimaryLocationX);
+    RecoNNAllEvalTree->Branch("truthPrimaryLocationY", "std::vector<double>", &truthPrimaryLocationY);
+    RecoNNAllEvalTree->Branch("truthPrimaryLocationZ", "std::vector<double>", &truthPrimaryLocationZ);
+
     RecoNNAllEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
     RecoNNAllEvalTree->Branch("WC2TPCsize", &WC2TPCsize, "WC2TPCsize/I");
     RecoNNAllEvalTree->Branch("WCTrackMomentum", &WCTrackMomentum, "WCTrackMomentum/D");
@@ -1660,6 +1695,10 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("chExchShowerLengths", "std::vector<double>", &chExchShowerLengths);
     RecoNNAllEvalTree->Branch("chExchShowerStart", "std::vector<std::vector<double>>", &chExchShowerStart);
     RecoNNAllEvalTree->Branch("chExchShowerEnd", "std::vector<std::vector<double>>", &chExchShowerEnd);
+
+    RecoNNAllEvalTree->Branch("chExchShowerNeutralPionID", &chExchShowerNeutralPionID, "chExchShowerNeutralPionID/I");
+    RecoNNAllEvalTree->Branch("chExchShowerNeutralPionDaughtersID", "std::vector<int>", &chExchShowerNeutralPionDaughtersID);
+    RecoNNAllEvalTree->Branch("chExchShowerNeutralPionDaughtersMom", "std::vector<std::vector<double>>", &chExchShowerNeutralPionDaughtersMom);
 
     RecoNNAllEvalTree->Branch("electronShowerIDs", "std::vector<int>", &electronShowerIDs);
     RecoNNAllEvalTree->Branch("electronShowerProcesses", "std::vector<std::string>", &electronShowerProcesses);
@@ -2188,7 +2227,10 @@ void RecoNNAllEval::resetTree() {
     truthPrimaryDaughtersPDG.clear();
     truthPrimaryDaughtersProcess.clear();
     truthPrimaryDaughtersKE.clear();
-    
+    truthPrimaryLocationX.clear();
+    truthPrimaryLocationY.clear();
+    truthPrimaryLocationZ.clear();
+
     truthScatteringAngle     = -99999;
     truthScatteredPionLength = -99999;
     truthScatteredPionKE     = -99999;
@@ -2236,6 +2278,9 @@ void RecoNNAllEval::resetTree() {
     chExchShowerLengths.clear();
     chExchShowerStart.clear();
     chExchShowerEnd.clear();
+    chExchShowerNeutralPionID = -1;
+    chExchShowerNeutralPionDaughtersID.clear();
+    chExchShowerNeutralPionDaughtersMom.clear();
 
     electronShowerIDs.clear();
     electronShowerProcesses.clear();
