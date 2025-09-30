@@ -93,6 +93,11 @@
 #include "larsim/MCCheater/ParticleInventoryService.h"
 
 // #####################
+// ### TMVA includes ###
+// #####################
+// #include "TMVA/Reader.h"
+
+// #####################
 // ### ROOT includes ###
 // #####################
 #include <TH1F.h>
@@ -156,6 +161,8 @@ class RecoNNAllEval : public art::EDAnalyzer {
         void initializePionPoints(TGraph *gPion);
         double computeReducedChi2(const TGraph* theory, const std::vector<double>& xData, const std::vector<double>& yData, int nPoints);
         double energyLossCalculation(double x, double px);
+
+        void fillBDTVariables(art::Event const &event);
 
     private: 
         // Product's names
@@ -457,7 +464,6 @@ class RecoNNAllEval : public art::EDAnalyzer {
         // Random generator
         int       fRandSeed = 1989;
         TRandom2* fRand     = new TRandom2(fRandSeed);
-
 };
 
 RecoNNAllEval::RecoNNAllEval(fhicl::ParameterSet const &p) : EDAnalyzer(p) ,fCaloAlg(p.get<fhicl::ParameterSet>("CaloAlg")) {
@@ -499,6 +505,14 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
     anab::MVAReader<recob::Hit, 4> hitResults(e, fNNetModuleLabel);
     std::vector<anab::FeatureVector<4>> featVec = hitResults.outputs();
+
+    //////////////
+    // Load BDT //
+    //////////////
+
+    // TMVA::Reader BDTReader;
+    // BDTReader.BookMVA("BDT", "/exp/lariat/app/users/epelaez/analysis/python/model/model.xml");
+    // (Moved to ROOT macro)
 
     /////////////////
     // Get MC data //

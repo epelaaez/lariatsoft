@@ -1,9 +1,18 @@
+execute_process(
+  COMMAND root-config --libdir
+  OUTPUT_VARIABLE ROOT_LIBDIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+cet_find_library(TMVA NAMES TMVA PATHS ${ROOT_LIBDIR} NO_DEFAULT_PATH)
+
 art_make(LIB_LIBRARIES larcorealg_Geometry
          larreco_RecoAlg_ClusterRecoUtil
          lardataobj_RecoBase
          ${ROOT_BASIC_LIB_LIST}
          ${ROOT_SPECTRUM}
-         MODULE_LIBRARIES LArIATRecoAlg
+         MODULE_LIBRARIES 
+         ${TMVA}
+         LArIATRecoAlg
          LArIATDataProducts
 	       LArIATAnaModule
          larevt_Filters
