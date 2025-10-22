@@ -53,13 +53,13 @@ physics: {
     reco: [ recotrackmcmatching ]
     ana: [ RecoNNAllEval ]
 
-    stream1: [ ]
+    stream1: [ out1 ]
 
     #end_paths is a keyword and contains the paths that do not modify the art::Event, 
     #ie analyzers and output streams.  these all run simultaneously
     
     trigger_paths: [ reco ]
-    end_paths:     [ ana ]  
+    end_paths:     [ ana ]
 }
 
 outputs: {
