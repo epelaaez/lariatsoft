@@ -2082,6 +2082,13 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("primariesEndX", "std::vector<double>", &primariesEndX);
     RecoNNAllEvalTree->Branch("primariesEndY", "std::vector<double>", &primariesEndY);
     RecoNNAllEvalTree->Branch("primariesEndZ", "std::vector<double>", &primariesEndZ);
+
+    RecoNNAllEvalTree->Branch("secondaryInteractionTypes", "std::vector<int>", &secondaryInteractionTypes);
+    RecoNNAllEvalTree->Branch("secondaryInteractionInteractingKE", "std::vector<double>", &secondaryInteractionInteractingKE);
+    RecoNNAllEvalTree->Branch("secondaryInteractionAngle", "std::vector<double>", &secondaryInteractionAngle);
+    RecoNNAllEvalTree->Branch("secondaryInteractionTrkID", "std::vector<int>", &secondaryInteractionTrkID);
+    RecoNNAllEvalTree->Branch("secondaryInteractionZPosition", "std::vector<double>", &secondaryInteractionZPosition);
+    RecoNNAllEvalTree->Branch("secondaryIncidentKEContributions", "std::vector<std::vector<double>>", &secondaryIncidentKEContributions);
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {

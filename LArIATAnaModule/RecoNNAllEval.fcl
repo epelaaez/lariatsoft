@@ -59,7 +59,7 @@ physics: {
     #ie analyzers and output streams.  these all run simultaneously
     
     trigger_paths: [ reco ]
-    end_paths:     [ ana ]
+    end_paths:     [ ana ] # add stream 1 for .out file
 }
 
 outputs: {
