@@ -155,7 +155,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         double distance(double x1, double x2, double y1, double y2, double z1, double z2);
         double curvatureForThreePoints(TVector3 p1, TVector3 p2, TVector3 p3);
         std::tuple<double, double> computeCurvature(recob::Track track);
-        int fillSignalInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
+        int fillSignalInformation(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE, bool saveNumProtons);
         int getBackgroundInteractionType(int pdg, double vx, double vy, double vz, bool interactionInTrajectory, std::string trajectoryInteractionLabel, std::vector<int> daughtersPDG, std::vector<std::string> daughtersProcess, std::vector<double> daughtersKE);
         void initializeProtonPoints(TGraph *gProton);
         void initializePionPoints(TGraph *gPion);
@@ -187,9 +187,6 @@ class RecoNNAllEval : public art::EDAnalyzer {
 
         // Calorimetry algorithm
         calo::CalorimetryAlg fCaloAlg;
-
-        // Histograms
-        TH1D* hTotalEvents;
 
         // fcl parameters
         bool         bVerbose;
@@ -446,8 +443,14 @@ class RecoNNAllEval : public art::EDAnalyzer {
 
         // Information about incident KE for secondary interactions
         std::vector<int>                 secondaryInteractionTrkID;
-        std::vector<double>              secondaryInteractionZPosition;
         std::vector<std::vector<double>> secondaryIncidentKEContributions;
+        std::vector<double>              secondaryInteractionXPosition;
+        std::vector<double>              secondaryInteractionYPosition;
+        std::vector<double>              secondaryInteractionZPosition;
+
+        std::vector<std::vector<int>>         secondaryInteractionDaughtersPDG;
+        std::vector<std::vector<double>>      secondaryInteractionDaughtersKE;
+        std::vector<std::vector<std::string>> secondaryInteractionDaughtersProcess;
 
         // Masses
         const double PionMass    = .13957018;    // in GeV
@@ -494,7 +497,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         event == 91707 ||
         event == 115702 ||
         event == 172759 ||
-        event == 264599
+        event == 264599 ||
+    	event == 162886 ||
+        event == 169306
     ) return; // Bad event, crashes the code for some reason
 
     // Get detector properties
@@ -640,6 +645,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     // Look at interactions through primary trajectory
     auto primaryTrajectoryProcessMap = primaryTrajectory.TrajectoryProcesses();
     TLorentzVector momBeforeInteraction, momAfterInteraction;
+    interactionInTrajectory = false;
     if (primaryTrajectory.size()) {
         for (auto const& couple: primaryTrajectoryProcessMap) {
             // Each couple is pair of the form (index, process key)
@@ -681,9 +687,15 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             } else if (interactionInTrajectory && thisPointProcess == "hadElastic") {
                 // Secondary interactions
                 secondaryInteractionTypes.push_back(12);
+                secondaryInteractionXPosition.push_back(trajectoryInteractionX);
+                secondaryInteractionYPosition.push_back(trajectoryInteractionY);
                 secondaryInteractionZPosition.push_back(trajectoryInteractionZ);
                 secondaryInteractionTrkID.push_back(truthPrimaryID);
                 secondaryInteractionInteractingKE.push_back(thisPointInteractionKE);
+
+                secondaryInteractionDaughtersPDG.push_back({});
+                secondaryInteractionDaughtersKE.push_back({});
+                secondaryInteractionDaughtersProcess.push_back({});
 
                 TLorentzVector before, after;
                 if (couple.first - 1 >= 0) {
@@ -768,15 +780,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         trajectoryInteractionLabel,
         truthPrimaryDaughtersPDG,
         truthPrimaryDaughtersProcess,
-        truthPrimaryDaughtersKE
+        truthPrimaryDaughtersKE,
+        true
     );
-
-    if (backgroundType == 12 || (backgroundType == 6 && numVisibleProtons == 0)) {
-        hTotalEvents->Fill(13);
-    } else if (backgroundType == 6 && numVisibleProtons > 0) {
-        hTotalEvents->Fill(14);
-    }
-    hTotalEvents->Fill(backgroundType);
 
     ////////////////////////////////////////////////////////
     // Loop until we find something other than scattering //
@@ -802,12 +808,19 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 "",
                 truthPrimaryDaughtersPDG,
                 truthPrimaryDaughtersProcess,
-                truthPrimaryDaughtersKE
+                truthPrimaryDaughtersKE,
+                false
             ));
             secondaryInteractionTrkID.push_back(truthPrimaryID);
+            secondaryInteractionXPosition.push_back(tempVx);
+            secondaryInteractionYPosition.push_back(tempVy);
             secondaryInteractionZPosition.push_back(tempVz);
             secondaryInteractionInteractingKE.push_back(truthPrimaryVertexKE);
             secondaryInteractionAngle.push_back(truthScatteringAngle);
+
+            secondaryInteractionDaughtersPDG.push_back(truthPrimaryDaughtersPDG);
+            secondaryInteractionDaughtersKE.push_back(truthPrimaryDaughtersKE);
+            secondaryInteractionDaughtersProcess.push_back(truthPrimaryDaughtersProcess);
 
             int lastInt = secondaryInteractionTypes[secondaryInteractionTypes.size() - 1];
             if ((lastInt != 12) && (lastInt != 6)) foundEnd = true; 
@@ -837,8 +850,14 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                     if (thisPointProcess == "hadElastic") {
                         secondaryInteractionTypes.push_back(12);
                         secondaryInteractionTrkID.push_back(nextPion->TrackId());
+                        secondaryInteractionXPosition.push_back((pionTraj.at(couple.first)).first.X());
+                        secondaryInteractionYPosition.push_back((pionTraj.at(couple.first)).first.Y());
                         secondaryInteractionZPosition.push_back((pionTraj.at(couple.first)).first.Z());
                         secondaryInteractionInteractingKE.push_back(thisPointInteractionKE);
+
+                        secondaryInteractionDaughtersPDG.push_back({});
+                        secondaryInteractionDaughtersKE.push_back({});
+                        secondaryInteractionDaughtersProcess.push_back({});
 
                         TLorentzVector before, after;
                         if (couple.first - 1 >= 0) {
@@ -881,12 +900,18 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 "",
                 pionDaughtersPDG,
                 pionDaughtersProcess,
-                pionDaughtersKE
+                pionDaughtersKE,
+                false
             );
 
             secondaryInteractionTypes.push_back(thisInteractionType);
             secondaryInteractionTrkID.push_back(nextPion->TrackId());
+            secondaryInteractionXPosition.push_back(nextPion->EndX());
+            secondaryInteractionYPosition.push_back(nextPion->EndY());
             secondaryInteractionZPosition.push_back(nextPion->EndZ());
+            secondaryInteractionDaughtersPDG.push_back(pionDaughtersPDG);
+            secondaryInteractionDaughtersKE.push_back(pionDaughtersKE);
+            secondaryInteractionDaughtersProcess.push_back(pionDaughtersProcess);
 
             double         thisVertexKE = -99999;
             TLorentzVector thisVertexMomentum;
@@ -1884,8 +1909,6 @@ void RecoNNAllEval::beginJob() {
     initializePionPoints(gPion);
 
     // Make histograms and tree branches
-    hTotalEvents = tfs->make<TH1D>("hTotalEvents", "hTotalEvents", NUM_BACKGROUND_TYPES, 0, NUM_BACKGROUND_TYPES);
-
     RecoNNAllEvalTree = tfs->make<TTree>("RecoNNAllEvalTree", "RecoNNAllEvalTree");
 
     RecoNNAllEvalTree->Branch("run", &run, "run/I");
@@ -2087,8 +2110,14 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("secondaryInteractionInteractingKE", "std::vector<double>", &secondaryInteractionInteractingKE);
     RecoNNAllEvalTree->Branch("secondaryInteractionAngle", "std::vector<double>", &secondaryInteractionAngle);
     RecoNNAllEvalTree->Branch("secondaryInteractionTrkID", "std::vector<int>", &secondaryInteractionTrkID);
+    RecoNNAllEvalTree->Branch("secondaryInteractionXPosition", "std::vector<double>", &secondaryInteractionXPosition);
+    RecoNNAllEvalTree->Branch("secondaryInteractionYPosition", "std::vector<double>", &secondaryInteractionYPosition);
     RecoNNAllEvalTree->Branch("secondaryInteractionZPosition", "std::vector<double>", &secondaryInteractionZPosition);
     RecoNNAllEvalTree->Branch("secondaryIncidentKEContributions", "std::vector<std::vector<double>>", &secondaryIncidentKEContributions);
+
+    RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersPDG", "std::vector<std::vector<int>>", &secondaryInteractionDaughtersPDG);
+    RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersKE", "std::vector<std::vector<double>>", &secondaryInteractionDaughtersKE);
+    RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersProcess", "std::vector<std::vector<std::string>>", &secondaryInteractionDaughtersProcess);
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -2217,7 +2246,8 @@ int RecoNNAllEval::fillSignalInformation(
     std::string trajectoryInteractionLabel,
     std::vector<int> daughtersPDG, 
     std::vector<std::string> daughtersProcess, 
-    std::vector<double> daughtersKE
+    std::vector<double> daughtersKE,
+    bool saveNumProtons
 ) {
     bool isPionAbsorptionSignalTemp = true;
 
@@ -2225,7 +2255,7 @@ int RecoNNAllEval::fillSignalInformation(
     if (!isWithinReducedVolume(vx, vy, vz)) isPionAbsorptionSignalTemp = false;
 
     int numDaughters = daughtersPDG.size();
-    numVisibleProtons = 0;
+    int tempNumVisibleProtons = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
         if ((daughtersPDG[iDaughter] == 11) && (daughtersProcess[iDaughter] == "hIoni")) { continue; }
         else if ((daughtersPDG[iDaughter] == 111) || (daughtersPDG[iDaughter] == 211) || (daughtersPDG[iDaughter] == -211)) { isPionAbsorptionSignalTemp = false; }
@@ -2238,7 +2268,7 @@ int RecoNNAllEval::fillSignalInformation(
             daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND &&
             daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND
         ) {
-            numVisibleProtons++;
+            tempNumVisibleProtons++;
         }
     }
 
@@ -2246,10 +2276,12 @@ int RecoNNAllEval::fillSignalInformation(
     // but we want information about the interaction after the elastic scattering
     if (interactionInTrajectory && trajectoryInteractionLabel == "hadElastic") isPionAbsorptionSignalTemp = false;
 
+    if (saveNumProtons) numVisibleProtons = tempNumVisibleProtons;
+
     if (isPionAbsorptionSignalTemp) {
         // Event is signal!
-        if (numVisibleProtons == 0) return 0;
-        else if (numVisibleProtons > 0) return 1;
+        if (tempNumVisibleProtons == 0) return 0;
+        else if (tempNumVisibleProtons > 0) return 1;
     } else {
         // Event is background, classify it
         return getBackgroundInteractionType(
@@ -2288,7 +2320,7 @@ int RecoNNAllEval::getBackgroundInteractionType(
 
     // If interaction is inside reduced volume, check daughters
     int numDaughters = daughtersPDG.size();
-    int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0; int numVisibleProtons = 0;
+    int numNegativePions = 0; int numNeutralPions = 0; int numPositivePions = 0;
     for (int iDaughter = 0; iDaughter < numDaughters; iDaughter++) {
         if (daughtersPDG[iDaughter] == -211) {
             numNegativePions++; 
@@ -2300,13 +2332,6 @@ int RecoNNAllEval::getBackgroundInteractionType(
             return 9;
         } else if (daughtersProcess[iDaughter] == "Decay") {
             return 10;
-        } else if (
-            daughtersProcess[iDaughter] == "pi-Inelastic" &&
-            daughtersPDG[iDaughter] == 2212 &&
-            daughtersKE[iDaughter] >= PROTON_ENERGY_LOWER_BOUND &&
-            daughtersKE[iDaughter] <= PROTON_ENERGY_UPPER_BOUND
-        ) {
-            numVisibleProtons++;
         }
     }
 
@@ -2683,8 +2708,14 @@ void RecoNNAllEval::resetTree() {
     secondaryInteractionInteractingKE.clear();
     secondaryInteractionAngle.clear();
     secondaryInteractionTrkID.clear();
+    secondaryInteractionXPosition.clear();
+    secondaryInteractionYPosition.clear();
     secondaryInteractionZPosition.clear();
     secondaryIncidentKEContributions.clear();
+
+    secondaryInteractionDaughtersPDG.clear();
+    secondaryInteractionDaughtersKE.clear();
+    secondaryInteractionDaughtersProcess.clear();
 }
 
 void RecoNNAllEval::endJob() {
