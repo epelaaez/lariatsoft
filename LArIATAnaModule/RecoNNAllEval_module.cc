@@ -647,6 +647,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     TLorentzVector momBeforeInteraction, momAfterInteraction;
     interactionInTrajectory = false;
     if (primaryTrajectory.size()) {
+        // std::cout << "Going through trajectory" << std::endl;
         for (auto const& couple: primaryTrajectoryProcessMap) {
             // Each couple is pair of the form (index, process key)
 
@@ -670,6 +671,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
             std::string thisPointProcess       = primaryTrajectory.KeyToProcess(couple.second);
             double      thisPointInteractionKE = primaryTrajectory.E(couple.first) - primaryMass;
+
+            // std::cout << "Found interaction at: " << interactionPosition.X() << ", " << interactionPosition.Y() << ", " << interactionPosition.Z() << std::endl;
+            // std::cout << "  Process: " << thisPointProcess << std::endl;
+            // std::cout << "  KE: " << thisPointInteractionKE << std::endl;
 
             if (!interactionInTrajectory && thisPointProcess == "hadElastic") {
                 interactionInTrajectory    = true;
@@ -708,6 +713,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             }
         }
     }
+
+    // std::cout << std::endl;
+    // std::cout << "Final particle vertex: " << truthPrimaryVertexX << ", " << truthPrimaryVertexY << ", " << truthPrimaryVertexZ << std::endl;
+    // std::cout << std::endl;
 
     // If no interaction in trajectory, last traj point is found by looping backwards
     if (!interactionInTrajectory) {
@@ -764,7 +773,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     truthSecondaryVertexY = scatteredPionEnd.Y();
     truthSecondaryVertexZ = scatteredPionEnd.Z();
 
-    // Re-locate vertex for elastic scatterings
+    // Re-locate vertex for elastic scatterings, but save original for later
+    double tempPrimaryVertexX = truthPrimaryVertexX;
+    double tempPrimaryVertexY = truthPrimaryVertexY;
+    double tempPrimaryVertexZ = truthPrimaryVertexZ;
     if (interactionInTrajectory) {
         truthPrimaryVertexX = finalTPCPoint->first.X();
         truthPrimaryVertexY = finalTPCPoint->first.Y();
@@ -797,13 +809,11 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 
         // For elastic scattering, figure out what happens at end of track
         if (backgroundType == 12) {
-            double tempVx = primariesEndX[validPrimaryIdx];
-            double tempVy = primariesEndY[validPrimaryIdx];
-            double tempVz = primariesEndZ[validPrimaryIdx];
-
             secondaryInteractionTypes.push_back(fillSignalInformation(
                 truthPrimaryPDG,
-                tempVx, tempVy, tempVz,
+                tempPrimaryVertexX,
+                tempPrimaryVertexY,
+                tempPrimaryVertexZ,
                 false,
                 "",
                 truthPrimaryDaughtersPDG,
@@ -812,9 +822,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 false
             ));
             secondaryInteractionTrkID.push_back(truthPrimaryID);
-            secondaryInteractionXPosition.push_back(tempVx);
-            secondaryInteractionYPosition.push_back(tempVy);
-            secondaryInteractionZPosition.push_back(tempVz);
+            secondaryInteractionXPosition.push_back(tempPrimaryVertexX);
+            secondaryInteractionYPosition.push_back(tempPrimaryVertexY);
+            secondaryInteractionZPosition.push_back(tempPrimaryVertexZ);
             secondaryInteractionInteractingKE.push_back(truthPrimaryVertexKE);
             secondaryInteractionAngle.push_back(truthScatteringAngle);
 
@@ -926,9 +936,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
             if (thisInteractionType == 6) {
                 for (size_t idxID = 0; idxID < pionDaughterIDs.size(); ++idxID) {
                     const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(pionDaughterIDs[idxID]);
-                    if (part->PdgCode() == -211) {
-                        nextPion = part;
-                    }
+                    if (part->PdgCode() == -211) nextPion = part;
                 }
             } else {
                 foundEnd = true;
@@ -2306,6 +2314,7 @@ int RecoNNAllEval::getBackgroundInteractionType(
     std::vector<std::string> daughtersProcess, 
     std::vector<double> daughtersKE
 ) {
+    // We first care about ID of the primary particle
     if (pdg != -211) {
         if (pdg == 13) { return 2; }
         else if (pdg == 11) { return 3; }
