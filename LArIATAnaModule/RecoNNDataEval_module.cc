@@ -875,9 +875,22 @@ void RecoNNDataEval::analyze(art::Event const &e) {
         if (fmthm.isValid()) {
             auto vhit = fmthm.at(thisTrack->ID());
             for (size_t h = 0; h < vhit.size(); ++h) {
-                if (thisTrack->ID() == WC2TPCtrkID) { hitWC2TPCKey.push_back(vhit[h].key()); }
-                else if (isThroughGoing) hitThroughTrack.push_back(vhit[h].key());
-                hitRecoAsTrackKey.push_back(vhit[h].key());
+                int hit_index = -1;
+                for (size_t k = 0; k < nWireHits; ++k) {
+                    if (fHitlist[k]->WireID().Plane != vhit[h]->WireID().Plane) continue;
+                    if (fHitlist[k]->WireID().Wire  != vhit[h]->WireID().Wire) continue;
+
+                    // Check if times match up exactly
+                    if (fHitlist[k]->PeakTime() == vhit[h]->PeakTime()) {
+                        hit_index = k;
+                        break;
+                    }
+                }
+                if (hit_index < 0) continue; // did not find hit in original list
+
+                if (thisTrack->ID() == WC2TPCtrkID) { hitWC2TPCKey.push_back(hit_index); }
+                else if (isThroughGoing) hitThroughTrack.push_back(hit_index);
+                hitRecoAsTrackKey.push_back(hit_index);
                 ++nHits;
             }
         }

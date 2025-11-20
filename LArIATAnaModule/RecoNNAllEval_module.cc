@@ -165,6 +165,8 @@ class RecoNNAllEval : public art::EDAnalyzer {
         void fillBDTVariables(art::Event const &event);
 
     private: 
+        std::ofstream outFileHits;
+
         // Product's names
         std::string strWCTrackBuilderLabel;
         std::string strTPCTrackHandleLabel;
@@ -470,7 +472,7 @@ class RecoNNAllEval : public art::EDAnalyzer {
         const double RmaxX = 42.0;
         const double RminY =-15.0;
         const double RmaxY = 15.0;
-        const double RminZ =  8.0;
+        const double RminZ = 30.0;
         const double RmaxZ = 82.0;
 
         // Random generator
@@ -1823,6 +1825,9 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     fHitCharge.reserve(nWireHits);
     fHitChargeCol.reserve(nWireHits);
 
+    // outFileHits << std::endl;
+    // outFileHits << "new event" << std::endl;
+
     // First, we get all the information about our hits
     for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
         int   hitPlane = fHitlist[iHit]->WireID().Plane;
@@ -1830,6 +1835,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         float hitTime  = fSamplingRate * (fHitlist[iHit]->PeakTime() - fXTicksOffset[hitPlane]);
         float ltCorFac = 1.;
         if (hitTime0 >= 0) { ltCorFac = exp(hitTime0 / fElectronLifeTime); }
+
+        // outFileHits << "key: " << fHitlist[iHit].key() << " index: " << iHit << " plane: " <<  hitPlane << std::endl;
 
         fHitKey.push_back(iHit);
         fHitPlane.push_back(hitPlane); // collection == 1, induction == 0
@@ -1860,6 +1867,12 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     
     // We now want to loop through tracks and find what hits are already associated to tracks
     int totalNHits = 0;
+
+    // int inductionHits  = 0;
+    // int collectionHits = 0;
+    // std::vector<int> collectionids;
+    // std::vector<int> inductionids;
+
     for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
         auto thisTrack = tracklist.at(trk_idx);
         int  nHits     = 0;
@@ -1871,11 +1884,39 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         );
 
         if (fmthm.isValid()) {
-            auto vhit = fmthm.at(thisTrack->ID());
+            auto const& vhit = fmthm.at(thisTrack->ID());
             for (size_t h = 0; h < vhit.size(); ++h) {
-                if (thisTrack->ID() == WC2TPCtrkID) { hitWC2TPCKey.push_back(vhit[h].key()); }
-                else if (isThroughGoing) hitThroughTrack.push_back(vhit[h].key());
-                hitRecoAsTrackKey.push_back(vhit[h].key());
+                // Hit "key" does not correspond to the actual hitlist indices, so we 
+                // need to loop through and find the match
+                int hit_index = -1;
+                for (size_t k = 0; k < nWireHits; ++k) {
+                    if (fHitlist[k]->WireID().Plane != vhit[h]->WireID().Plane) continue;
+                    if (fHitlist[k]->WireID().Wire  != vhit[h]->WireID().Wire) continue;
+
+                    // Check if times match up exactly
+                    if (fHitlist[k]->PeakTime() == vhit[h]->PeakTime()) {
+                        hit_index = k;
+                        break;
+                    }
+                }
+                if (hit_index < 0) continue; // did not find hit in original list
+
+                if (thisTrack->ID() == WC2TPCtrkID) {
+                    // outFileHits << "primary plane: " << vhit[h]->WireID().Plane << std::endl;
+                    // if (vhit[h]->WireID().Plane == 0) {
+                    //     outFileHits << "  induction " << hit_index << std::endl;
+                    //     inductionHits++;
+                    //     inductionids.push_back(hit_index);
+                    // }
+                    // if (vhit[h]->WireID().Plane == 1) {
+                    //     outFileHits << "  collection " << hit_index << std::endl;
+                    //     collectionHits++;
+                    //     collectionids.push_back(hit_index);
+                    // }
+                    hitWC2TPCKey.push_back(hit_index);
+                }
+                else if (isThroughGoing) hitThroughTrack.push_back(hit_index);
+                hitRecoAsTrackKey.push_back(hit_index);
                 ++nHits;
             }
         }
@@ -1883,6 +1924,20 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         if (bVerbose) std::cout << "    Hits for this track: " << nHits << std::endl;
     }
     if (bVerbose) std:: cout << "Total hits for all tracks: " << totalNHits << std::endl;
+
+    // outFileHits << "primary collection hits: " << collectionHits << std::endl;
+    // outFileHits << "primary induction hits:  " << inductionHits << std::endl;
+
+    // outFileHits << "looping through collection hits"<< std::endl;
+    // for (size_t i = 0; i < collectionids.size(); ++i) {
+    //     outFileHits << "  id saved: " << collectionids[i] << std::endl;
+    //     outFileHits << "  plane in main vector: " << fHitPlane[collectionids[i]] << std::endl;
+    // }
+    // outFileHits << "looping through induction hits"<< std::endl;
+    // for (size_t i = 0; i < inductionids.size(); ++i) {
+    //     outFileHits << "  id saved: " << inductionids[i] << std::endl;
+    //     outFileHits << "  plane in main vector: " << fHitPlane[inductionids[i]] << std::endl;
+    // }
 
     // First, we find the end hit for the main TPC track
     float maxHitTime = -1e9;
@@ -1911,6 +1966,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
 void RecoNNAllEval::beginJob() {
     if (bVerbose) std::cout << "Beginning job." << std::endl;
     art::ServiceHandle<art::TFileService> tfs;
+
+    outFileHits.open("/exp/lariat/app/users/epelaez/analysis/files/RecoNNAllEval/debughits.txt");
 
     // Initialize chi^2 graphs
     initializeProtonPoints(gProton);
@@ -2125,7 +2182,7 @@ void RecoNNAllEval::beginJob() {
 
     RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersPDG", "std::vector<std::vector<int>>", &secondaryInteractionDaughtersPDG);
     RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersKE", "std::vector<std::vector<double>>", &secondaryInteractionDaughtersKE);
-    RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersProcess", "std::vector<std::vector<std::string>>", &secondaryInteractionDaughtersProcess);
+    RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersProcess", "std::vector<std::vector<std::string>>", &secondaryInteractionDaughtersProcess); // not saving for some reason
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
