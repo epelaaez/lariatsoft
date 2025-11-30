@@ -1,0 +1,47 @@
+#include "services_lariat.fcl"
+#include "WeightsPiMinus.fcl"
+#include "Material.fcl"
+
+process_name: CalculateWeights
+
+services: {
+    TFileService: { fileName: "CalculateWeights_histo.root" }
+    RandomNumberGenerator: {} #ART native random number generator
+    #message:      @local::lariat_message_services
+    @table::lariat_services
+}
+
+source: {
+    module_type: RootInput
+    maxEvents:   -1
+}
+
+outputs: {
+    out1: {
+        module_type: RootOutput
+        fileName:    "CalculateWeights_out.root"
+    }
+}
+
+physics: {
+    analyzers: {
+        CalculateWeights: {
+            module_type: "CalculateWeights"
+            Verbose: true
+            ParticlePDG: -211
+            SimulationLabel: largeant
+            fracsfile: "/exp/lariat/app/users/epelaez/files/weights/g4_fracs_piminus.root"
+            parameters: @local::PiMinusParameters
+            material: @local::LAr
+            mode: multisim
+            number_of_multisim: 1000
+        }
+    }
+
+    reco: [ ]
+    ana : [ CalculateWeights ]
+    stream1: [ out1 ]
+
+    trigger_paths: [ reco ]
+    end_paths: [ ana, stream1 ]
+}
