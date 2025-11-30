@@ -27,20 +27,20 @@ physics: {
     analyzers: {
         CalculateWeights: {
             module_type: "CalculateWeights"
-            Verbose: true
+            Verbose: false
             ParticlePDG: -211
             SimulationLabel: largeant
             fracsfile: "/exp/lariat/app/users/epelaez/files/weights/g4_fracs_piminus.root"
             parameters: @local::PiMinusParameters
             material: @local::LAr
             mode: multisim
-            number_of_multisim: 1000
+            number_of_multisim: 100
         }
     }
 
     reco: [ ]
     ana : [ CalculateWeights ]
-    stream1: [ out1 ]
+    stream1: [ ]
 
     trigger_paths: [ reco ]
     end_paths: [ ana, stream1 ]

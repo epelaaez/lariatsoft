@@ -301,6 +301,7 @@ void CalculateWeights::analyze(art::Event const &evt) {
 
     // Initialize vector of weights
     weights.resize(numSims, 1.0);
+    p_weight.resize(numSims, 1.0);
     
     // Loop over MCParticles in the event
     for (size_t iParticle = 0; iParticle < plist.size(); ++iParticle) {
