@@ -40,8 +40,8 @@ physics: {
 
     reco: [ ]
     ana : [ CalculateWeights ]
-    stream1: [ ]
+    stream1: [ out1 ]
 
     trigger_paths: [ reco ]
-    end_paths: [ ana, stream1 ]
+    end_paths: [ ana ]
 }

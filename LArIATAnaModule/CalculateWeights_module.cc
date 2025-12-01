@@ -135,8 +135,13 @@
 #include "geant4reweight/src/ReweightBase/G4ReweightStep.hh"
 #include "geant4reweight/src/PropBase/G4ReweightParameterMaker.hh"
 
+enum class ProcType : uint8_t {
+    kDefault = 0,
+    kElastic = 1,
+    kInelastic = 2
+};
 double BetheBloch(double energy, double mass);
-std::vector<std::pair<double, int>> ThinSliceBetheBloch(G4ReweightTraj* theTraj, double res, double mass, bool isElastic);
+std::vector<std::pair<double, int>> ThinSliceBetheBloch(G4ReweightTraj* theTraj, double res, double mass, bool isElastic, const std::vector<ProcType>& proc_types);
 
 class CalculateWeights : public art::EDAnalyzer {
     public:
@@ -259,6 +264,10 @@ void CalculateWeights::beginJob() {
 
     numSims = UniverseVals.size();
 
+    // Make vectors the right size
+    weights.resize(numSims, 1.0);
+    p_weight.resize(numSims, 1.0);
+
     // Make histograms and tree branches
     art::ServiceHandle<art::TFileService> tfs;
     WeightsTree = tfs->make<TTree>("WeightsTree", "WeightsTree");
@@ -268,7 +277,6 @@ void CalculateWeights::beginJob() {
     WeightsTree->Branch("event", &event, "event/I");
     WeightsTree->Branch("weights", "std::vector<double>", &weights);
     WeightsTree->Branch("p_weight", "std::vector<double>", &p_weight);
-
 }
 
 void CalculateWeights::endJob() {
@@ -289,6 +297,7 @@ void CalculateWeights::analyze(art::Event const &evt) {
     // Load geometry
     art::ServiceHandle<geo::Geometry> geom;
     geo::View_t view = geom->View(0);
+    geo::TPCID tpcid;
 
     // Get simulated particles
     auto particle_handle = evt.getValidHandle<std::vector<simb::MCParticle>>(simulation_producer_label_);
@@ -298,10 +307,6 @@ void CalculateWeights::analyze(art::Event const &evt) {
     // Get particle list
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     const sim::ParticleList& plist = pi_serv->ParticleList();
-
-    // Initialize vector of weights
-    weights.resize(numSims, 1.0);
-    p_weight.resize(numSims, 1.0);
     
     // Loop over MCParticles in the event
     for (size_t iParticle = 0; iParticle < plist.size(); ++iParticle) {
@@ -337,23 +342,24 @@ void CalculateWeights::analyze(art::Event const &evt) {
                 double Y = p->Position(i).Y();
                 double Z = p->Position(i).Z();
                 geo::Point_t testpoint1 {X, Y, Z};
-                const TGeoMaterial* testmaterial1 = geom->Material(testpoint1);
+                // const TGeoMaterial* testmaterial1 = geom->Material(testpoint1);
 
-                if (!strcmp(testmaterial1->GetName(), "LAr")) {
-                    trajpoint_X.push_back(X);
-                    trajpoint_Y.push_back(Y);
-                    trajpoint_Z.push_back(Z);
+                try { tpcid = geom->PositionToTPCID(testpoint1); }
+                catch (...) { continue; } // point not in a TPC (i.e., not in LAr active volume) 
 
-                    trajpoint_PX.push_back(p->Px(i));
-                    trajpoint_PY.push_back(p->Py(i));
-                    trajpoint_PZ.push_back(p->Pz(i));
+                trajpoint_X.push_back(X);
+                trajpoint_Y.push_back(Y);
+                trajpoint_Z.push_back(Z);
 
-                    auto itProc = process_map.find(i);
-                    if (itProc != process_map.end() && itProc->second == "hadElastic") {
-                        // Push back the index relative to the start of the reweightable steps
-                        elastic_indices.push_back(trajpoint_X.size() - 1);
-                        // if (fDebug) std::cout << "Elastic index: " << trajpoint_X.size() - 1 << std::endl;
-                    }
+                trajpoint_PX.push_back(p->Px(i));
+                trajpoint_PY.push_back(p->Py(i));
+                trajpoint_PZ.push_back(p->Pz(i));
+
+                auto itProc = process_map.find(i);
+                if (itProc != process_map.end() && itProc->second == "hadElastic") {
+                    // Push back the index relative to the start of the reweightable steps
+                    elastic_indices.push_back(trajpoint_X.size() - 1);
+                    // if (fDebug) std::cout << "Elastic index: " << trajpoint_X.size() - 1 << std::endl;
                 }
             }
 
@@ -386,24 +392,29 @@ void CalculateWeights::analyze(art::Event const &evt) {
             if (nSteps < 2) continue;
 
             p_nElasticScatters = elastic_indices.size();
-            for (size_t iStep = 1; iStep < nSteps; ++iStep) {
-                std::string proc = "default";
+            std::unordered_set<size_t> elasticSet(elastic_indices.begin(), elastic_indices.end()); // for lookup
 
-                if (iStep == trajpoint_PX.size() - 1) {
-                    proc = EndProcess;
-                } else if (std::find(elastic_indices.begin(), elastic_indices.end(), iStep) != elastic_indices.end()) {
-                    proc = "hadElastic";
-                }
+            // Store process types
+            std::vector<ProcType> proc_types;
+            proc_types.reserve(nSteps); proc_types.push_back(ProcType::kDefault);
+
+            for (size_t iStep = 1; iStep < nSteps; ++iStep) {
+                // Save process to fast enum
+                ProcType procType = ProcType::kDefault;
+                if (elasticSet.count(iStep)) procType = ProcType::kElastic;
+                else if (iStep == trajpoint_PX.size() - 1 && EndProcess.find("Inelastic") != std::string::npos) procType = ProcType::kInelastic;
+                proc_types.push_back(procType);
+
+                // Still have to save string
+                std::string proc = "default";
+                if (iStep == trajpoint_PX.size() - 1) proc = EndProcess;
+                else if (std::find(elastic_indices.begin(), elastic_indices.end(), iStep) != elastic_indices.end()) proc = "hadElastic";
 
                 double deltaX = (trajpoint_X.at(iStep) - trajpoint_X.at(iStep-1));
                 double deltaY = (trajpoint_Y.at(iStep) - trajpoint_Y.at(iStep-1));
                 double deltaZ = (trajpoint_Z.at(iStep) - trajpoint_Z.at(iStep-1));
 
-                double len = sqrt(
-                    std::pow(deltaX, 2) +
-                    std::pow(deltaY, 2) +
-                    std::pow(deltaZ, 2)
-                );
+                double len = std::sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
 
                 double preStepP[3] = {
                     trajpoint_PX.at(iStep-1)*1.e3,
@@ -427,25 +438,25 @@ void CalculateWeights::analyze(art::Event const &evt) {
                 G4ReweightStep* theStep = new G4ReweightStep(mcpID, p_PDG, 0, event, preStepP, postStepP, len, proc);
                 theStep->SetDeltaX(deltaX); theStep->SetDeltaY(deltaY); theStep->SetDeltaZ(deltaZ);
                 theTraj.AddStep(theStep);
-
-                for (size_t k = 0; k < daughter_PDGs.size(); ++k) {
-                    theTraj.AddChild(
-                        new G4ReweightTraj(daughter_IDs[k], daughter_PDGs[k], mcpID, event, std::make_pair(0,0))
-                    );
-                }
             } // end loop over iStep
+
+            for (size_t k = 0; k < daughter_PDGs.size(); ++k) {
+                theTraj.AddChild(
+                    new G4ReweightTraj(daughter_IDs[k], daughter_PDGs[k], mcpID, event, std::make_pair(0,0))
+                );
+            }
 
             p_track_length = theTraj.GetTotalLength();
 
-            p_init_momentum = sqrt(theTraj.GetEnergy() * theTraj.GetEnergy() - mass*mass);
-            p_final_momentum = sqrt(
-                std::pow(theTraj.GetStep(theTraj.GetNSteps() - 1 )->GetPreStepPx(), 2) +
-                std::pow(theTraj.GetStep(theTraj.GetNSteps() - 1 )->GetPreStepPy(), 2) +
-                std::pow(theTraj.GetStep(theTraj.GetNSteps() - 1 )->GetPreStepPz(), 2)
-            );
+            p_init_momentum = std::sqrt(theTraj.GetEnergy() * theTraj.GetEnergy() - mass*mass);
 
-            std::vector<std::pair<double, int>> thin_slice_inelastic = ThinSliceBetheBloch(&theTraj, .5, mass, false);
-            std::vector<std::pair<double, int>> thin_slice_elastic   = ThinSliceBetheBloch(&theTraj, .5, mass, true);
+            double pfx = theTraj.GetStep(theTraj.GetNSteps() - 1 )->GetPreStepPx();
+            double pfy = theTraj.GetStep(theTraj.GetNSteps() - 1 )->GetPreStepPy();
+            double pfz = theTraj.GetStep(theTraj.GetNSteps() - 1 )->GetPreStepPz();
+            p_final_momentum = std::sqrt(pfx * pfx + pfy * pfy + pfz * pfz);
+
+            std::vector<std::pair<double, int>> thin_slice_inelastic = ThinSliceBetheBloch(&theTraj, .5, mass, false, proc_types);
+            std::vector<std::pair<double, int>> thin_slice_elastic   = ThinSliceBetheBloch(&theTraj, .5, mass, true, proc_types);
 
             p_energies_inel.clear();
             p_sliceInts_inel.clear();
@@ -494,8 +505,8 @@ void CalculateWeights::analyze(art::Event const &evt) {
 }
 
 void CalculateWeights::resetTree() {
-    weights.clear();
-    p_weight.clear();
+    std::fill(weights.begin(), weights.end(), 1.0);
+    std::fill(p_weight.begin(), p_weight.end(), 1.0);
 }
 
 void CalculateWeights::reconfigure(fhicl::ParameterSet const& pset) {
@@ -510,32 +521,27 @@ void CalculateWeights::reconfigure(fhicl::ParameterSet const& pset) {
     mode = pset.get<std::string>("mode");
 }
 
-double BetheBloch(double energy, double mass){
-    //Need to make this configurable? Or delete...
-    double K = .307075;
-    double rho = 1.390;
-    double Z = 18;
-    double A = 40;
-    double I = 188E-6;
-    double me = .511;
-    //Need to make sure this is total energy, not KE
-    double gamma = energy/mass;
-    double beta = sqrt( 1. - (1. / (gamma*gamma)) );
-    double Tmax = 2 * me * beta*beta * gamma*gamma;
+inline double BetheBloch(double E, double m) {
+    static constexpr double K = .307075;
+    static constexpr double rho = 1.390;
+    static constexpr double Z = 18;
+    static constexpr double A = 40;
+    static constexpr double I = 188E-6;
+    static constexpr double me = .511;
 
-    double first = K * (Z/A) * rho / (beta*beta);
-    double second = .5 * log(Tmax*Tmax/(I*I)) - beta*beta;
-
-    double dEdX = first*second;
-    return dEdX;
+    double gamma = E / m;
+    double beta2 = 1. - 1. / (gamma * gamma);
+    double Tmax  = 2 * me * beta2 * gamma * gamma;
+    return (K * (Z/A) * rho / beta2) * (0.5 * log(Tmax * Tmax / (I * I)) - beta2);
 }
 
 std::vector<std::pair<double, int>> ThinSliceBetheBloch(
     G4ReweightTraj * theTraj, 
     double res, 
     double mass, 
-    bool isElastic) 
-{
+    bool isElastic,
+    const std::vector<ProcType>& proc_types
+) {
     std::vector< std::pair<double, int> > result;
 
     //First slice position
@@ -556,101 +562,74 @@ std::vector<std::pair<double, int>> ThinSliceBetheBloch(
 
     double sliceEnergy = theTraj->GetEnergy();
     size_t nSteps = theTraj->GetNSteps();
-    for(size_t is = 0; is < nSteps; ++is) {
-        auto theStep = theTraj->GetStep(is);
 
-        disp += theStep->GetStepLength();
-        currentSlice = floor(disp/res);
+    double inv_res = 1.0 / res;
+    for (size_t is = 0; is < nSteps; ++is) {
+        auto theStep  = theTraj->GetStep(is);
+        disp         += theStep->GetStepLength();
+        currentSlice  = int(disp * inv_res);
+        ProcType type = proc_types[is];
 
-        std::string theProc = theStep->GetStepChosenProc();
-
-        //Check to see if in a new slice and it's not the end
-        if( oldSlice != currentSlice && is < nSteps - 1){
-
-
-            //Save Interaction info of the prev slice
-            //and reset
-            result.push_back( std::make_pair(sliceEnergy, interactInSlice) );
+        // Check to see if in a new slice and it's not the end
+        if (oldSlice != currentSlice && is < nSteps - 1){
+            //Save interaction info of the prev slice and reset
+            result.push_back(std::make_pair(sliceEnergy, interactInSlice));
             interactInSlice = 0;
 
-            //Update the energy
-            sliceEnergy = sliceEnergy - res*BetheBloch(sliceEnergy, mass);
-            if( sliceEnergy - mass < 0.){
-                //std::cout << "Warning! Negative energy " << sliceEnergy - mass << std::endl;
-                //std::cout << "Crossed " << oldSlice - currentSlice << std::endl;
-                sliceEnergy = 0.0001;
-            }
-            //If it's more than 1 slice, add in non-interacting slices
-            for(int ic = 1; ic < abs( oldSlice - currentSlice ); ++ic){
-                //std::cout << ic << std::endl;
+            // Update the energy
+            sliceEnergy = sliceEnergy - res * BetheBloch(sliceEnergy, mass);
+            if (sliceEnergy - mass < 0.) sliceEnergy = 0.0001;
 
-                result.push_back( std::make_pair(sliceEnergy, 0) );
+            // If it's more than 1 slice, add in non-interacting slices
+            for (int ic = 1; ic < abs(oldSlice - currentSlice); ++ic){
+                result.push_back(std::make_pair(sliceEnergy, 0));
 
-                //Update the energy again
-                sliceEnergy = sliceEnergy - res*BetheBloch(sliceEnergy, mass);
-                if( sliceEnergy - mass < 0.){
-                    //std::cout << "Warning! Negative energy " << sliceEnergy - mass << std::endl;
-                    //std::cout << "Crossed " << oldSlice - currentSlice << std::endl;
-                    sliceEnergy = 0.0001;
-                }
+                // Update the energy again
+                sliceEnergy = sliceEnergy - res * BetheBloch(sliceEnergy, mass);
+                if (sliceEnergy - mass < 0.) sliceEnergy = 0.0001;
             }
 
-            if ((!isElastic && theProc.find(std::string("Inelastic")) != std::string::npos) || (isElastic && theProc.find(std::string("hadElastic")) != std::string::npos)) {
-                // std::cout << "found! " << theProc << '\n';
+            if ((!isElastic  && type == ProcType::kInelastic) || (isElastic  && type == ProcType::kElastic)) {
                 interactInSlice = 1;
             }
-        }
-        //It's crossed a slice and it's the last step. Save both info
-        else if( oldSlice != currentSlice && is == nSteps - 1 ){
-            result.push_back( std::make_pair(sliceEnergy, interactInSlice) );
+        } else if(oldSlice != currentSlice && is == nSteps - 1) {
+            // It's crossed a slice and it's the last step. Save both info
+
+            result.push_back(std::make_pair(sliceEnergy, interactInSlice));
             interactInSlice = 0;
 
-            //Update the energy
+            // Update the energy
             sliceEnergy = sliceEnergy - res*BetheBloch(sliceEnergy, mass);
-            if( sliceEnergy - mass < 0.){
-                //std::cout << "Warning! Negative energy " << sliceEnergy - mass << std::endl;
-                //std::cout << "Crossed " << oldSlice - currentSlice << std::endl;
-                sliceEnergy = 0.0001;
-            }
+            if (sliceEnergy - mass < 0.) sliceEnergy = 0.0001;
+
             //If it's more than 1 slice, add in non-interacting slices
-            for(int ic = 1; ic < abs( oldSlice - currentSlice ); ++ic){
-                //std::cout << ic << std::endl;
+            for (int ic = 1; ic < abs(oldSlice - currentSlice); ++ic) {
+                result.push_back( std::make_pair(sliceEnergy, 0));
 
-                result.push_back( std::make_pair(sliceEnergy, 0) );
-
-                //Update the energy again
-                sliceEnergy = sliceEnergy - res*BetheBloch(sliceEnergy, mass);
-                if( sliceEnergy - mass < 0.){
-                    //std::cout << "Warning! Negative energy " << sliceEnergy - mass << std::endl;
-                    //std::cout << "Crossed " << oldSlice - currentSlice << std::endl;
-                    sliceEnergy = 0.0001;
-                }
+                // Update the energy again
+                sliceEnergy = sliceEnergy - res * BetheBloch(sliceEnergy, mass);
+                if (sliceEnergy - mass < 0.) sliceEnergy = 0.0001;
             }
 
-            //Save the last slice
-            if ((!isElastic && theProc.find(std::string("Inelastic")) != std::string::npos) || (isElastic && theProc.find(std::string("hadElastic")) != std::string::npos)) {
-                // std::cout << "found! " << theProc << '\n';
+            // Save the last slice
+            if ((!isElastic  && type == ProcType::kInelastic) || (isElastic  && type == ProcType::kElastic)) {
                 interactInSlice = 1;
             }
-            result.push_back( std::make_pair(sliceEnergy, interactInSlice) );
-        }
-        //It's the end, so just save this last info
-        else if( oldSlice == currentSlice && is == nSteps - 1 ){
-            if ((!isElastic && theProc.find(std::string("Inelastic")) != std::string::npos) || (isElastic && theProc.find(std::string("hadElastic")) != std::string::npos)) {
-                // std::cout << "found! " << theProc << '\n';
+            result.push_back(std::make_pair(sliceEnergy, interactInSlice));
+        } else if(oldSlice == currentSlice && is == nSteps - 1) {
+            // It's the end, so just save this last info
+            if ((!isElastic  && type == ProcType::kInelastic) || ( isElastic  && type == ProcType::kElastic)) {
                 interactInSlice = 1;
             }
-            result.push_back( std::make_pair(sliceEnergy, interactInSlice) );
-        }
-        //Same slice, not the end. Check for interactions
-        else {
-            if ((!isElastic && theProc.find(std::string("Inelastic")) != std::string::npos) || (isElastic && theProc.find(std::string("hadElastic")) != std::string::npos)) {
-                // std::cout << "found! " << theProc << '\n';
+            result.push_back(std::make_pair(sliceEnergy, interactInSlice));
+        } else {
+            // Same slice, not the end. Check for interactions
+            if ((!isElastic  && type == ProcType::kInelastic) || (isElastic  && type == ProcType::kElastic)) {
                 interactInSlice = 1;
             }
         }
 
-        //Update oldslice
+        // Update old slice
         oldSlice = currentSlice;
     }
     return result;
