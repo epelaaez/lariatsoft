@@ -224,15 +224,15 @@ class RecoNNDataEval : public art::EDAnalyzer {
         //    14: Np scattering
 
         // Shower probabilities information
-        double trackProb;
-        double showerProb;
-        bool   obtainedProbabilities;
+        // double trackProb;
+        // double showerProb;
+        // bool   obtainedProbabilities;
 
-        double showerNoBoxProb;
-        bool   obtainedNoBoxProbabilities;
+        // double showerNoBoxProb;
+        // bool   obtainedNoBoxProbabilities;
 
-        double showerOutsideBoxProb;
-        bool   obtainedOutsideBoxProbabilities;
+        // double showerOutsideBoxProb;
+        // bool   obtainedOutsideBoxProbabilities;
 
         // WC variables
         int    WC2TPCtrkID;
@@ -379,8 +379,8 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     ///////////////////////
 
     // Get NN data
-    anab::MVAReader<recob::Hit, 4> hitResults(e, fNNetModuleLabel);
-    std::vector<anab::FeatureVector<4>> featVec = hitResults.outputs();
+    // anab::MVAReader<recob::Hit, 4> hitResults(e, fNNetModuleLabel);
+    // std::vector<anab::FeatureVector<4>> featVec = hitResults.outputs();
 
     // Get hits information
     art::Handle< std::vector<recob::Hit> > hitListHandle;
@@ -539,7 +539,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     art::FindManyP<anab::Calorimetry> fmcal(tpcTrackHandle, e, strCalorimetryModuleLabel);
 
     // Check that there is a WC to TPC match, and check if pion stops inside fiducial volume
-    int WC2TPCtrackIndex = -1;
+    // int WC2TPCtrackIndex = -1;
     if (WC2TPCtrkID != -99999) {
         // Found match, now find track
         for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
@@ -548,7 +548,7 @@ void RecoNNDataEval::analyze(art::Event const &e) {
             recob::TrackTrajectory::Point_t recoWC2TPCEnd;
 
             if (thisTrack->ID() == WC2TPCtrkID) {
-                WC2TPCtrackIndex = trk_idx;
+                // WC2TPCtrackIndex = trk_idx;
 
                 // Get primary track coordinates
                 int numCoordPoints = thisTrack->NPoints();
@@ -615,79 +615,79 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     // Neural net primary electron detection //
     ///////////////////////////////////////////
 
-    double total_shower_prob = 0.0;
-    int num_hits = 0;
+    // double total_shower_prob = 0.0;
+    // int num_hits = 0;
 
-    double total_shower_prob_no_box = 0.0;
-    int num_hits_no_box = 0;
+    // double total_shower_prob_no_box = 0.0;
+    // int num_hits_no_box = 0;
 
-    double total_shower_prob_outside_box = 0.0;
-    int num_hits_outside_box = 0;
+    // double total_shower_prob_outside_box = 0.0;
+    // int num_hits_outside_box = 0;
 
-    if (HitsInTrack.isValid() && WC2TPCtrackIndex != -1 && WC2TPCtrkID != -99999) {
-        int lowest_hit = -1;
-        std::vector<art::Ptr<recob::Hit>> trackhits = HitsInTrack.at(WC2TPCtrackIndex);
-        for (size_t iHit = 0; iHit < trackhits.size(); ++iHit) {
-            if (trackhits[iHit]->View() != 1) continue;
-            if (lowest_hit == -1) lowest_hit = iHit;
-            if (trackhits[iHit]->WireID().Wire < trackhits[lowest_hit]->WireID().Wire) lowest_hit = iHit;
-        }
+    // if (HitsInTrack.isValid() && WC2TPCtrackIndex != -1 && WC2TPCtrkID != -99999) {
+    //     int lowest_hit = -1;
+    //     std::vector<art::Ptr<recob::Hit>> trackhits = HitsInTrack.at(WC2TPCtrackIndex);
+    //     for (size_t iHit = 0; iHit < trackhits.size(); ++iHit) {
+    //         if (trackhits[iHit]->View() != 1) continue;
+    //         if (lowest_hit == -1) lowest_hit = iHit;
+    //         if (trackhits[iHit]->WireID().Wire < trackhits[lowest_hit]->WireID().Wire) lowest_hit = iHit;
+    //     }
 
-        for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
-            if (fHitlist[iHit]->WireID().Plane != 1) continue;
+    //     for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
+    //         if (fHitlist[iHit]->WireID().Plane != 1) continue;
             
-            int wireID  = fHitlist[iHit]->WireID().Wire;
-            int hitTime = fHitlist[iHit]->PeakTime();
+    //         int wireID  = fHitlist[iHit]->WireID().Wire;
+    //         int hitTime = fHitlist[iHit]->PeakTime();
 
-            // Get NN output
-            total_shower_prob_no_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
-            num_hits_no_box++;
-        }
-        total_shower_prob_no_box /= double(num_hits_no_box);
+    //         // Get NN output
+    //         total_shower_prob_no_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
+    //         num_hits_no_box++;
+    //     }
+    //     total_shower_prob_no_box /= double(num_hits_no_box);
 
-        showerNoBoxProb = total_shower_prob_no_box;
-        obtainedNoBoxProbabilities = true;
+    //     showerNoBoxProb = total_shower_prob_no_box;
+    //     obtainedNoBoxProbabilities = true;
 
-        if (lowest_hit != -1) {
-            double inter  = trackhits[lowest_hit]->PeakTime();
-            double offset = trackhits[lowest_hit]->WireID().Wire;
+    //     if (lowest_hit != -1) {
+    //         double inter  = trackhits[lowest_hit]->PeakTime();
+    //         double offset = trackhits[lowest_hit]->WireID().Wire;
 
-            if (!(offset > 100. || inter > 3000.)) {
-                for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
-                    if (fHitlist[iHit]->WireID().Plane != 1) continue;
+    //         if (!(offset > 100. || inter > 3000.)) {
+    //             for (size_t iHit = 0; iHit < nWireHits; ++iHit) {
+    //                 if (fHitlist[iHit]->WireID().Plane != 1) continue;
 
-                    int wireID  = fHitlist[iHit]->WireID().Wire;
-                    int hitTime = fHitlist[iHit]->PeakTime();
+    //                 int wireID  = fHitlist[iHit]->WireID().Wire;
+    //                 int hitTime = fHitlist[iHit]->PeakTime();
                     
-                    if(
-                        wireID > (offset + 100.0) || 
-                        wireID < offset ||
-                        hitTime > (inter + 200.0) || 
-                        hitTime < (inter - 200.0)
-                    ) {
-                        total_shower_prob_outside_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]);
-                        num_hits_outside_box++;
-                        continue;
-                    }
+    //                 if(
+    //                     wireID > (offset + 100.0) || 
+    //                     wireID < offset ||
+    //                     hitTime > (inter + 200.0) || 
+    //                     hitTime < (inter - 200.0)
+    //                 ) {
+    //                     total_shower_prob_outside_box += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]);
+    //                     num_hits_outside_box++;
+    //                     continue;
+    //                 }
 
-                    if (hitTime > 3000.) continue;
-                    if (wireID > 240.) continue;
+    //                 if (hitTime > 3000.) continue;
+    //                 if (wireID > 240.) continue;
 
-                    // Get NN output
-                    total_shower_prob += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
-                    num_hits++;
-                }
-                total_shower_prob /= double(num_hits);
+    //                 // Get NN output
+    //                 total_shower_prob += featVec[iHit][1] / (featVec[iHit][0] + featVec[iHit][1]); 
+    //                 num_hits++;
+    //             }
+    //             total_shower_prob /= double(num_hits);
 
-                showerProb = total_shower_prob;
-                trackProb  = 1. - showerProb;
-                obtainedProbabilities = true;
+    //             showerProb = total_shower_prob;
+    //             trackProb  = 1. - showerProb;
+    //             obtainedProbabilities = true;
 
-                showerOutsideBoxProb = total_shower_prob_outside_box / double(num_hits_outside_box);
-                obtainedOutsideBoxProbabilities = true;
-            }
-        }
-    }
+    //             showerOutsideBoxProb = total_shower_prob_outside_box / double(num_hits_outside_box);
+    //             obtainedOutsideBoxProbabilities = true;
+    //         }
+    //     }
+    // }
 
     //////////////////////////////////////
     // Small tracks cut and track chi^2 //
@@ -938,15 +938,15 @@ void RecoNNDataEval::beginJob() {
     RecoNNDataEvalTree->Branch("event", &event, "event/I");
     RecoNNDataEvalTree->Branch("isData", &isData, "isData/O");
 
-    RecoNNDataEvalTree->Branch("trackProb", &trackProb, "trackProb/D");
-    RecoNNDataEvalTree->Branch("showerProb", &showerProb, "showerProb/D");
-    RecoNNDataEvalTree->Branch("obtainedProbabilities", &obtainedProbabilities, "obtainedProbabilities/O");
+    // RecoNNDataEvalTree->Branch("trackProb", &trackProb, "trackProb/D");
+    // RecoNNDataEvalTree->Branch("showerProb", &showerProb, "showerProb/D");
+    // RecoNNDataEvalTree->Branch("obtainedProbabilities", &obtainedProbabilities, "obtainedProbabilities/O");
 
-    RecoNNDataEvalTree->Branch("showerNoBoxProb", &showerNoBoxProb, "showerNoBoxProb/D");
-    RecoNNDataEvalTree->Branch("obtainedNoBoxProbabilities", &obtainedNoBoxProbabilities, "obtainedNoBoxProbabilities/O");
+    // RecoNNDataEvalTree->Branch("showerNoBoxProb", &showerNoBoxProb, "showerNoBoxProb/D");
+    // RecoNNDataEvalTree->Branch("obtainedNoBoxProbabilities", &obtainedNoBoxProbabilities, "obtainedNoBoxProbabilities/O");
 
-    RecoNNDataEvalTree->Branch("showerOutsideBoxProb", &showerOutsideBoxProb, "showerOutsideBoxProb/D");
-    RecoNNDataEvalTree->Branch("obtainedOutsideBoxProbabilities", &obtainedOutsideBoxProbabilities, "obtainedOutsideBoxProbabilities/O");
+    // RecoNNDataEvalTree->Branch("showerOutsideBoxProb", &showerOutsideBoxProb, "showerOutsideBoxProb/D");
+    // RecoNNDataEvalTree->Branch("obtainedOutsideBoxProbabilities", &obtainedOutsideBoxProbabilities, "obtainedOutsideBoxProbabilities/O");
 
     RecoNNDataEvalTree->Branch("WC2TPCtrkID", &WC2TPCtrkID, "WC2TPCtrkID/I");
     RecoNNDataEvalTree->Branch("WC2TPCsize", &WC2TPCsize, "WC2TPCsize/I");
@@ -1268,15 +1268,15 @@ void RecoNNDataEval::resetTree() {
     passesSmallTracksCut   = false;
     passesMeanCurvatureCut = false;
 
-    trackProb             = 1.;
-    showerProb            = 0.;
-    obtainedProbabilities = false;
+    // trackProb             = 1.;
+    // showerProb            = 0.;
+    // obtainedProbabilities = false;
 
-    showerNoBoxProb = 0.;
-    obtainedNoBoxProbabilities = false;
+    // showerNoBoxProb = 0.;
+    // obtainedNoBoxProbabilities = false;
 
-    showerOutsideBoxProb = 0.;
-    obtainedOutsideBoxProbabilities = false;
+    // showerOutsideBoxProb = 0.;
+    // obtainedOutsideBoxProbabilities = false;
 
     WC2TPCtrkID = -99999;
     WC2TPCsize  = -99999;
