@@ -249,15 +249,15 @@ class RecoNNAllEval : public art::EDAnalyzer {
         //    14: Np scattering
 
         // Shower probabilities information
-        double trackProb;
-        double showerProb;
-        bool   obtainedProbabilities;
+        // double trackProb;
+        // double showerProb;
+        // bool   obtainedProbabilities;
 
-        double showerNoBoxProb;
-        bool   obtainedNoBoxProbabilities;
+        // double showerNoBoxProb;
+        // bool   obtainedNoBoxProbabilities;
 
-        double showerOutsideBoxProb;
-        bool   obtainedOutsideBoxProbabilities;
+        // double showerOutsideBoxProb;
+        // bool   obtainedOutsideBoxProbabilities;
 
         // Truth primary information
         int                      truthPrimaryPDG;
@@ -501,8 +501,20 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         event == 172759 ||
         event == 264599 ||
     	event == 162886 ||
-        event == 169306
-    ) return; // Bad event, crashes the code for some reason
+        event == 169306 ||
+        event == 387556 ||
+        event == 4778 ||
+        event == 340854 ||
+        event == 71974 ||
+        event == 71975 ||
+        event == 337423 ||
+        event == 36161 ||
+        event == 185194 ||
+        event == 274352 ||
+        event == 155712 ||
+        event == 157598 ||
+        event == 332085
+    ) return; // Bad events, crashes the code for some reason
 
     // Get detector properties
     fEfield           = fDetProp->Efield(0);
