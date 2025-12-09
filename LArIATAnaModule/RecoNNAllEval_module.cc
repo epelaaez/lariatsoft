@@ -1952,6 +1952,8 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 if (meta) {
                     auto const& pos = thisTrack->LocationAtPoint(meta->Index());
                     thisTrackHitX.push_back(pos.X()); thisTrackHitY.push_back(pos.Y()); thisTrackHitZ.push_back(pos.Z());
+                } else {
+                    thisTrackHitX.push_back(-9999); thisTrackHitY.push_back(-9999); thisTrackHitZ.push_back(-9999);
                 }
             }
             recoTrackHitIndices.push_back(thisTrackHitIndex);

@@ -921,6 +921,8 @@ void RecoNNDataEval::analyze(art::Event const &e) {
                 if (meta) {
                     auto const& pos = thisTrack->LocationAtPoint(meta->Index());
                     thisTrackHitX.push_back(pos.X()); thisTrackHitY.push_back(pos.Y()); thisTrackHitZ.push_back(pos.Z());
+                } else {
+                    thisTrackHitX.push_back(-9999); thisTrackHitY.push_back(-9999); thisTrackHitZ.push_back(-9999);
                 }
             }
             recoTrackHitIndices.push_back(thisTrackHitIndex);
@@ -1050,7 +1052,7 @@ void RecoNNDataEval::beginJob() {
     RecoNNDataEvalTree->Branch("numTaggedAsProton", &numTaggedAsProton, "numTaggedAsProton/I");
     RecoNNDataEvalTree->Branch("numNotTagged", &numNotTagged, "numTaggenumNotTaggeddAsPions/I");
 
-    RecoNNDataEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
+    // RecoNNDataEvalTree->Branch("fHitlist", "std::vector<art::Ptr<recob::Hit>>", &fHitlist);
     RecoNNDataEvalTree->Branch("fHitKey", "std::vector<int>", &fHitKey);
     RecoNNDataEvalTree->Branch("fHitPlane", "std::vector<int>", &fHitPlane);
     RecoNNDataEvalTree->Branch("fHitT", "std::vector<float>", &fHitT);
