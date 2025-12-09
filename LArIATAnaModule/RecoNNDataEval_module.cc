@@ -322,6 +322,12 @@ class RecoNNDataEval : public art::EDAnalyzer {
         double                            primaryEndPointHitX;
         double                            primaryEndPointHitW;
 
+        // Hits for reconstructed tracks
+        std::vector<std::vector<int>>    recoTrackHitIndices;
+        std::vector<std::vector<double>> recoTrackHitX;
+        std::vector<std::vector<double>> recoTrackHitY;
+        std::vector<std::vector<double>> recoTrackHitZ;
+
         // Masses
         const double PionMass    = .13957018;    // in GeV
         const double ProtonMass  = .93827208816; // in GeV
@@ -862,6 +868,12 @@ void RecoNNDataEval::analyze(art::Event const &e) {
     
     // We now want to loop through tracks and find what hits are already associated to tracks
     int totalNHits = 0;
+
+    recoTrackHitIndices.reserve(tpcTrackHandle->size());
+    recoTrackHitX.reserve(tpcTrackHandle->size());
+    recoTrackHitY.reserve(tpcTrackHandle->size());
+    recoTrackHitZ.reserve(tpcTrackHandle->size());
+
     for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
         auto thisTrack = tracklist.at(trk_idx);
         int  nHits     = 0;
@@ -874,7 +886,18 @@ void RecoNNDataEval::analyze(art::Event const &e) {
 
         if (fmthm.isValid()) {
             auto vhit = fmthm.at(thisTrack->ID());
+            auto const& vmeta = fmthm.data(thisTrack->ID());
+
+            std::vector<int> thisTrackHitIndex; thisTrackHitIndex.reserve(vhit.size());
+            std::vector<double> thisTrackHitX; thisTrackHitX.reserve(vhit.size());
+            std::vector<double> thisTrackHitY; thisTrackHitY.reserve(vhit.size());
+            std::vector<double> thisTrackHitZ; thisTrackHitZ.reserve(vhit.size());
+
             for (size_t h = 0; h < vhit.size(); ++h) {
+                // Get meta for hit
+                auto const* meta = vmeta[h];
+
+                // Get index for hit
                 int hit_index = -1;
                 for (size_t k = 0; k < nWireHits; ++k) {
                     if (fHitlist[k]->WireID().Plane != vhit[h]->WireID().Plane) continue;
@@ -887,12 +910,28 @@ void RecoNNDataEval::analyze(art::Event const &e) {
                     }
                 }
                 if (hit_index < 0) continue; // did not find hit in original list
+                thisTrackHitIndex.push_back(hit_index);
 
                 if (thisTrack->ID() == WC2TPCtrkID) { hitWC2TPCKey.push_back(hit_index); }
                 else if (isThroughGoing) hitThroughTrack.push_back(hit_index);
                 hitRecoAsTrackKey.push_back(hit_index);
                 ++nHits;
+
+                // Get the 3D coordinate from the track
+                if (meta) {
+                    auto const& pos = thisTrack->LocationAtPoint(meta->Index());
+                    thisTrackHitX.push_back(pos.X()); thisTrackHitY.push_back(pos.Y()); thisTrackHitZ.push_back(pos.Z());
+                }
             }
+            recoTrackHitIndices.push_back(thisTrackHitIndex);
+            recoTrackHitX.push_back(thisTrackHitX);
+            recoTrackHitY.push_back(thisTrackHitY);
+            recoTrackHitZ.push_back(thisTrackHitZ);
+        } else {
+            recoTrackHitIndices.push_back({});
+            recoTrackHitX.push_back({});
+            recoTrackHitY.push_back({});
+            recoTrackHitZ.push_back({});
         }
         totalNHits += nHits;
         if (bVerbose) std::cout << "    Hits for this track: " << nHits << std::endl;
@@ -1019,6 +1058,11 @@ void RecoNNDataEval::beginJob() {
     RecoNNDataEvalTree->Branch("fHitW", "std::vector<float>", &fHitW);
     RecoNNDataEvalTree->Branch("fHitCharge", "std::vector<float>", &fHitCharge);
     RecoNNDataEvalTree->Branch("fHitChargeCol", "std::vector<float>", &fHitChargeCol);
+
+    RecoNNDataEvalTree->Branch("recoTrackHitIndices", "std::vector<std::vector<int>>", &recoTrackHitIndices);
+    RecoNNDataEvalTree->Branch("recoTrackHitX", "std::vector<std::vector<double>>", &recoTrackHitX);
+    RecoNNDataEvalTree->Branch("recoTrackHitY", "std::vector<std::vector<double>>", &recoTrackHitY);
+    RecoNNDataEvalTree->Branch("recoTrackHitZ", "std::vector<std::vector<double>>", &recoTrackHitZ);
 
     RecoNNDataEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
     RecoNNDataEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
@@ -1313,6 +1357,11 @@ void RecoNNDataEval::resetTree() {
     fHitW.clear();
     fHitCharge.clear();
     fHitChargeCol.clear();
+
+    recoTrackHitIndices.clear();
+    recoTrackHitX.clear();
+    recoTrackHitY.clear();
+    recoTrackHitZ.clear();
 
     wcMatchDEDX.clear();
     wcMatchResR.clear();

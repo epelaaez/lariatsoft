@@ -438,6 +438,12 @@ class RecoNNAllEval : public art::EDAnalyzer {
         double                            primaryEndPointHitX;
         double                            primaryEndPointHitW;
 
+        // Hits for reconstructed tracks
+        std::vector<std::vector<int>>    recoTrackHitIndices;
+        std::vector<std::vector<double>> recoTrackHitX;
+        std::vector<std::vector<double>> recoTrackHitY;
+        std::vector<std::vector<double>> recoTrackHitZ;
+
         // Interaction after some scattering
         std::vector<int>                secondaryInteractionTypes;
         std::vector<double>             secondaryInteractionInteractingKE;
@@ -1880,10 +1886,10 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     // We now want to loop through tracks and find what hits are already associated to tracks
     int totalNHits = 0;
 
-    // int inductionHits  = 0;
-    // int collectionHits = 0;
-    // std::vector<int> collectionids;
-    // std::vector<int> inductionids;
+    recoTrackHitIndices.reserve(tpcTrackHandle->size());
+    recoTrackHitX.reserve(tpcTrackHandle->size());
+    recoTrackHitY.reserve(tpcTrackHandle->size());
+    recoTrackHitZ.reserve(tpcTrackHandle->size());
 
     for (size_t trk_idx = 0; trk_idx < tpcTrackHandle->size(); ++trk_idx) {
         auto thisTrack = tracklist.at(trk_idx);
@@ -1896,8 +1902,18 @@ void RecoNNAllEval::analyze(art::Event const &e) {
         );
 
         if (fmthm.isValid()) {
-            auto const& vhit = fmthm.at(thisTrack->ID());
+            auto const& vhit  = fmthm.at(thisTrack->ID());
+            auto const& vmeta = fmthm.data(thisTrack->ID());
+
+            std::vector<int> thisTrackHitIndex; thisTrackHitIndex.reserve(vhit.size());
+            std::vector<double> thisTrackHitX; thisTrackHitX.reserve(vhit.size());
+            std::vector<double> thisTrackHitY; thisTrackHitY.reserve(vhit.size());
+            std::vector<double> thisTrackHitZ; thisTrackHitZ.reserve(vhit.size());
+
             for (size_t h = 0; h < vhit.size(); ++h) {
+                // Get meta for hit
+                auto const* meta = vmeta[h];
+
                 // Hit "key" does not correspond to the actual hitlist indices, so we 
                 // need to loop through and find the match
                 int hit_index = -1;
@@ -1912,6 +1928,7 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                     }
                 }
                 if (hit_index < 0) continue; // did not find hit in original list
+                thisTrackHitIndex.push_back(hit_index);
 
                 if (thisTrack->ID() == WC2TPCtrkID) {
                     // outFileHits << "primary plane: " << vhit[h]->WireID().Plane << std::endl;
@@ -1930,7 +1947,22 @@ void RecoNNAllEval::analyze(art::Event const &e) {
                 else if (isThroughGoing) hitThroughTrack.push_back(hit_index);
                 hitRecoAsTrackKey.push_back(hit_index);
                 ++nHits;
+
+                // Get the 3D coordinate from the track
+                if (meta) {
+                    auto const& pos = thisTrack->LocationAtPoint(meta->Index());
+                    thisTrackHitX.push_back(pos.X()); thisTrackHitY.push_back(pos.Y()); thisTrackHitZ.push_back(pos.Z());
+                }
             }
+            recoTrackHitIndices.push_back(thisTrackHitIndex);
+            recoTrackHitX.push_back(thisTrackHitX);
+            recoTrackHitY.push_back(thisTrackHitY);
+            recoTrackHitZ.push_back(thisTrackHitZ);
+        } else {
+            recoTrackHitIndices.push_back({});
+            recoTrackHitX.push_back({});
+            recoTrackHitY.push_back({});
+            recoTrackHitZ.push_back({});
         }
         totalNHits += nHits;
         if (bVerbose) std::cout << "    Hits for this track: " << nHits << std::endl;
@@ -2135,6 +2167,11 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("fHitCharge", "std::vector<float>", &fHitCharge);
     RecoNNAllEvalTree->Branch("fHitChargeCol", "std::vector<float>", &fHitChargeCol);
 
+    RecoNNAllEvalTree->Branch("recoTrackHitIndices", "std::vector<std::vector<int>>", &recoTrackHitIndices);
+    RecoNNAllEvalTree->Branch("recoTrackHitX", "std::vector<std::vector<double>>", &recoTrackHitX);
+    RecoNNAllEvalTree->Branch("recoTrackHitY", "std::vector<std::vector<double>>", &recoTrackHitY);
+    RecoNNAllEvalTree->Branch("recoTrackHitZ", "std::vector<std::vector<double>>", &recoTrackHitZ);
+
     RecoNNAllEvalTree->Branch("hitRecoAsTrackKey", "std::vector<int>", &hitRecoAsTrackKey);
     RecoNNAllEvalTree->Branch("hitWC2TPCKey", "std::vector<int>", &hitWC2TPCKey);
     RecoNNAllEvalTree->Branch("hitThroughTrack", "std::vector<int>", &hitThroughTrack);
@@ -2194,7 +2231,7 @@ void RecoNNAllEval::beginJob() {
 
     RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersPDG", "std::vector<std::vector<int>>", &secondaryInteractionDaughtersPDG);
     RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersKE", "std::vector<std::vector<double>>", &secondaryInteractionDaughtersKE);
-    RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersProcess", "std::vector<std::vector<std::string>>", &secondaryInteractionDaughtersProcess); // not saving for some reason
+    // RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersProcess", "std::vector<std::vector<std::string>>", &secondaryInteractionDaughtersProcess); // not saving for some reason
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -2735,6 +2772,11 @@ void RecoNNAllEval::resetTree() {
     fHitW.clear();
     fHitCharge.clear();
     fHitChargeCol.clear();
+
+    recoTrackHitIndices.clear();
+    recoTrackHitX.clear();
+    recoTrackHitY.clear();
+    recoTrackHitZ.clear();
 
     hitRecoAsTrackKey.clear();
     hitWC2TPCKey.clear();
