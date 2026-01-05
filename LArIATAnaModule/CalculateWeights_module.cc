@@ -440,6 +440,7 @@ void CalculateWeights::analyze(art::Event const &evt) {
                 theTraj.AddStep(theStep);
             } // end loop over iStep
 
+            /// Add daughters to trajectory
             for (size_t k = 0; k < daughter_PDGs.size(); ++k) {
                 theTraj.AddChild(
                     new G4ReweightTraj(daughter_IDs[k], daughter_PDGs[k], mcpID, event, std::make_pair(0,0))

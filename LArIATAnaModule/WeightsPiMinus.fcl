@@ -4,16 +4,9 @@ BEGIN_PROLOG
 
 PiMinusParameters: [ 
   {
-    Name:       "fPiMinusInelLow"
+    Name:       "fPiMinusInel"
     Cut:        "inel"
-    Range:      [10., 200.]
-    Nominal:    1
-    Sigma:      0.2
-  } ,
-  {
-    Name:       "fPiMinusInelHigh"
-    Cut:        "inel"
-    Range:      [700., 2005.]
+    Range:      [10., 2005.]
     Nominal:    1.0
     Sigma:      0.2
   },
