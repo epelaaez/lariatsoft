@@ -36,14 +36,14 @@ PiMinusParameters: [
     Cut:        "dcex"
     Range:      [10.0, 2005.00]
     Nominal:    1.0
-    Sigma:      0.25
+    Sigma:      1.0
   },
   {
     Name:       "fPiMinusPiProd"
     Cut:        "prod"
     Range:      [10.0, 2005.00]
     Nominal:    1.0
-    Sigma:      0.25
+    Sigma:      1.0
   } 
 ]
 
