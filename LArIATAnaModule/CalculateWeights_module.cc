@@ -328,7 +328,7 @@ void CalculateWeights::analyze(art::Event const &evt) {
             std::vector<double> trajpoint_PZ;
             std::vector<int> elastic_indices;
 
-            // Get list of processses from true trajector
+            // Get list of processses from true trajectory
             const std::vector<std::pair<size_t, unsigned char>>& processes = p->Trajectory().TrajectoryProcesses();
             std::map<size_t, std::string> process_map;
 
@@ -346,6 +346,11 @@ void CalculateWeights::analyze(art::Event const &evt) {
 
                 try { tpcid = geom->PositionToTPCID(testpoint1); }
                 catch (...) { continue; } // point not in a TPC (i.e., not in LAr active volume) 
+
+                // Hard coded LArIAT bounds
+                if (X < 0.0 || X > 47.0 || Y < -20.0 || Y > 20.0 || Z < 3.0 || Z > 87.0) {
+                    continue; // point outside of detector bounds
+                }
 
                 trajpoint_X.push_back(X);
                 trajpoint_Y.push_back(Y);
@@ -502,6 +507,19 @@ void CalculateWeights::analyze(art::Event const &evt) {
             }
         }
     }
+
+    double w_avg = 0.0;
+    if (event == 19899) {
+        std::cout << "Event " << event << " weights: ";
+        for (size_t j = 0; j < weights.size(); ++j) {
+            std::cout << weights.at(j) << ", ";
+            w_avg += weights.at(j);
+        }
+        w_avg /= weights.size();
+        std::cout << std::endl;
+        std::cout << "Average weight: " << w_avg << std::endl;
+    }
+
     WeightsTree->Fill();
 }
 
