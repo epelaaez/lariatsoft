@@ -507,19 +507,6 @@ void CalculateWeights::analyze(art::Event const &evt) {
             }
         }
     }
-
-    double w_avg = 0.0;
-    if (event == 19899) {
-        std::cout << "Event " << event << " weights: ";
-        for (size_t j = 0; j < weights.size(); ++j) {
-            std::cout << weights.at(j) << ", ";
-            w_avg += weights.at(j);
-        }
-        w_avg /= weights.size();
-        std::cout << std::endl;
-        std::cout << "Average weight: " << w_avg << std::endl;
-    }
-
     WeightsTree->Fill();
 }
 
