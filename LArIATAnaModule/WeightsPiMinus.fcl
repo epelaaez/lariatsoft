@@ -11,7 +11,7 @@ PiMinusParameters: [
     Sigma:      0.2
   },
   {
-    Name:       "fPiMinusElast"
+    Name:       "fPiMinusElast" 
     Cut:        "elast"
     Range:      [10., 2005.]
     Nominal:    1.0

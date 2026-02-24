@@ -1,0 +1,1686 @@
+BEGIN_PROLOG
+
+PiMinusParameters: [
+{
+  Name:       "fPiMinusInel0"
+  Cut:        "inel"
+  Range:      [12.5, 37.5]
+  Nominal:    1.0
+  Sigma:      1.199092
+},
+{
+  Name:       "fPiMinusInel1"
+  Cut:        "inel"
+  Range:      [37.5, 62.5]
+  Nominal:    1.0
+  Sigma:      0.695009
+},
+{
+  Name:       "fPiMinusInel2"
+  Cut:        "inel"
+  Range:      [62.5, 87.5]
+  Nominal:    1.0
+  Sigma:      0.532885
+},
+{
+  Name:       "fPiMinusInel3"
+  Cut:        "inel"
+  Range:      [87.5, 112.5]
+  Nominal:    1.0
+  Sigma:      0.362784
+},
+{
+  Name:       "fPiMinusInel4"
+  Cut:        "inel"
+  Range:      [112.5, 137.5]
+  Nominal:    1.0
+  Sigma:      0.173772
+},
+{
+  Name:       "fPiMinusInel5"
+  Cut:        "inel"
+  Range:      [137.5, 162.5]
+  Nominal:    1.0
+  Sigma:      0.213086
+},
+{
+  Name:       "fPiMinusInel6"
+  Cut:        "inel"
+  Range:      [162.5, 187.5]
+  Nominal:    1.0
+  Sigma:      0.263098
+},
+{
+  Name:       "fPiMinusInel7"
+  Cut:        "inel"
+  Range:      [187.5, 212.5]
+  Nominal:    1.0
+  Sigma:      0.267224
+},
+{
+  Name:       "fPiMinusInel8"
+  Cut:        "inel"
+  Range:      [212.5, 237.5]
+  Nominal:    1.0
+  Sigma:      0.227757
+},
+{
+  Name:       "fPiMinusInel9"
+  Cut:        "inel"
+  Range:      [237.5, 262.5]
+  Nominal:    1.0
+  Sigma:      0.229684
+},
+{
+  Name:       "fPiMinusInel10"
+  Cut:        "inel"
+  Range:      [262.5, 287.5]
+  Nominal:    1.0
+  Sigma:      0.237281
+},
+{
+  Name:       "fPiMinusInel11"
+  Cut:        "inel"
+  Range:      [287.5, 312.5]
+  Nominal:    1.0
+  Sigma:      0.225891
+},
+{
+  Name:       "fPiMinusInel12"
+  Cut:        "inel"
+  Range:      [312.5, 337.5]
+  Nominal:    1.0
+  Sigma:      0.234757
+},
+{
+  Name:       "fPiMinusInel13"
+  Cut:        "inel"
+  Range:      [337.5, 362.5]
+  Nominal:    1.0
+  Sigma:      0.234096
+},
+{
+  Name:       "fPiMinusInel14"
+  Cut:        "inel"
+  Range:      [362.5, 387.5]
+  Nominal:    1.0
+  Sigma:      0.206458
+},
+{
+  Name:       "fPiMinusInel15"
+  Cut:        "inel"
+  Range:      [387.5, 412.5]
+  Nominal:    1.0
+  Sigma:      0.332955
+},
+{
+  Name:       "fPiMinusInel16"
+  Cut:        "inel"
+  Range:      [412.5, 437.5]
+  Nominal:    1.0
+  Sigma:      0.329243
+},
+{
+  Name:       "fPiMinusInel17"
+  Cut:        "inel"
+  Range:      [437.5, 462.5]
+  Nominal:    1.0
+  Sigma:      0.340440
+},
+{
+  Name:       "fPiMinusInel18"
+  Cut:        "inel"
+  Range:      [462.5, 487.5]
+  Nominal:    1.0
+  Sigma:      0.341151
+},
+{
+  Name:       "fPiMinusInel19"
+  Cut:        "inel"
+  Range:      [487.5, 512.5]
+  Nominal:    1.0
+  Sigma:      0.343023
+},
+{
+  Name:       "fPiMinusInel20"
+  Cut:        "inel"
+  Range:      [512.5, 537.5]
+  Nominal:    1.0
+  Sigma:      0.352874
+},
+{
+  Name:       "fPiMinusInel21"
+  Cut:        "inel"
+  Range:      [537.5, 562.5]
+  Nominal:    1.0
+  Sigma:      0.360178
+},
+{
+  Name:       "fPiMinusInel22"
+  Cut:        "inel"
+  Range:      [562.5, 587.5]
+  Nominal:    1.0
+  Sigma:      0.372826
+},
+{
+  Name:       "fPiMinusInel23"
+  Cut:        "inel"
+  Range:      [587.5, 612.5]
+  Nominal:    1.0
+  Sigma:      0.390515
+},
+{
+  Name:       "fPiMinusInel24"
+  Cut:        "inel"
+  Range:      [612.5, 637.5]
+  Nominal:    1.0
+  Sigma:      0.405624
+},
+{
+  Name:       "fPiMinusInel25"
+  Cut:        "inel"
+  Range:      [637.5, 662.5]
+  Nominal:    1.0
+  Sigma:      0.406443
+},
+{
+  Name:       "fPiMinusInel26"
+  Cut:        "inel"
+  Range:      [662.5, 687.5]
+  Nominal:    1.0
+  Sigma:      0.420242
+},
+{
+  Name:       "fPiMinusInel27"
+  Cut:        "inel"
+  Range:      [687.5, 712.5]
+  Nominal:    1.0
+  Sigma:      0.422589
+},
+{
+  Name:       "fPiMinusInel28"
+  Cut:        "inel"
+  Range:      [712.5, 737.5]
+  Nominal:    1.0
+  Sigma:      0.434456
+},
+{
+  Name:       "fPiMinusInel29"
+  Cut:        "inel"
+  Range:      [737.5, 762.5]
+  Nominal:    1.0
+  Sigma:      0.442080
+},
+{
+  Name:       "fPiMinusInel30"
+  Cut:        "inel"
+  Range:      [762.5, 787.5]
+  Nominal:    1.0
+  Sigma:      0.451528
+},
+{
+  Name:       "fPiMinusInel31"
+  Cut:        "inel"
+  Range:      [787.5, 812.5]
+  Nominal:    1.0
+  Sigma:      0.467595
+},
+{
+  Name:       "fPiMinusInel32"
+  Cut:        "inel"
+  Range:      [812.5, 837.5]
+  Nominal:    1.0
+  Sigma:      0.472003
+},
+{
+  Name:       "fPiMinusInel33"
+  Cut:        "inel"
+  Range:      [837.5, 862.5]
+  Nominal:    1.0
+  Sigma:      0.478751
+},
+{
+  Name:       "fPiMinusInel34"
+  Cut:        "inel"
+  Range:      [862.5, 887.5]
+  Nominal:    1.0
+  Sigma:      0.485131
+},
+{
+  Name:       "fPiMinusInel35"
+  Cut:        "inel"
+  Range:      [887.5, 912.5]
+  Nominal:    1.0
+  Sigma:      0.493439
+},
+{
+  Name:       "fPiMinusInel36"
+  Cut:        "inel"
+  Range:      [912.5, 937.5]
+  Nominal:    1.0
+  Sigma:      0.498368
+},
+{
+  Name:       "fPiMinusInel37"
+  Cut:        "inel"
+  Range:      [937.5, 962.5]
+  Nominal:    1.0
+  Sigma:      0.506037
+},
+{
+  Name:       "fPiMinusInel38"
+  Cut:        "inel"
+  Range:      [962.5, 987.5]
+  Nominal:    1.0
+  Sigma:      0.508539
+},
+{
+  Name:       "fPiMinusInel39"
+  Cut:        "inel"
+  Range:      [987.5, 1012.5]
+  Nominal:    1.0
+  Sigma:      0.514985
+},
+{
+  Name:       "fPiMinusElast0"
+  Cut:        "elast"
+  Range:      [12.5, 37.5]
+  Nominal:    1.0
+  Sigma:      1.199092
+},
+{
+  Name:       "fPiMinusElast1"
+  Cut:        "elast"
+  Range:      [37.5, 62.5]
+  Nominal:    1.0
+  Sigma:      0.695009
+},
+{
+  Name:       "fPiMinusElast2"
+  Cut:        "elast"
+  Range:      [62.5, 87.5]
+  Nominal:    1.0
+  Sigma:      0.532885
+},
+{
+  Name:       "fPiMinusElast3"
+  Cut:        "elast"
+  Range:      [87.5, 112.5]
+  Nominal:    1.0
+  Sigma:      0.362784
+},
+{
+  Name:       "fPiMinusElast4"
+  Cut:        "elast"
+  Range:      [112.5, 137.5]
+  Nominal:    1.0
+  Sigma:      0.173772
+},
+{
+  Name:       "fPiMinusElast5"
+  Cut:        "elast"
+  Range:      [137.5, 162.5]
+  Nominal:    1.0
+  Sigma:      0.213086
+},
+{
+  Name:       "fPiMinusElast6"
+  Cut:        "elast"
+  Range:      [162.5, 187.5]
+  Nominal:    1.0
+  Sigma:      0.263098
+},
+{
+  Name:       "fPiMinusElast7"
+  Cut:        "elast"
+  Range:      [187.5, 212.5]
+  Nominal:    1.0
+  Sigma:      0.267224
+},
+{
+  Name:       "fPiMinusElast8"
+  Cut:        "elast"
+  Range:      [212.5, 237.5]
+  Nominal:    1.0
+  Sigma:      0.227757
+},
+{
+  Name:       "fPiMinusElast9"
+  Cut:        "elast"
+  Range:      [237.5, 262.5]
+  Nominal:    1.0
+  Sigma:      0.229684
+},
+{
+  Name:       "fPiMinusElast10"
+  Cut:        "elast"
+  Range:      [262.5, 287.5]
+  Nominal:    1.0
+  Sigma:      0.237281
+},
+{
+  Name:       "fPiMinusElast11"
+  Cut:        "elast"
+  Range:      [287.5, 312.5]
+  Nominal:    1.0
+  Sigma:      0.225891
+},
+{
+  Name:       "fPiMinusElast12"
+  Cut:        "elast"
+  Range:      [312.5, 337.5]
+  Nominal:    1.0
+  Sigma:      0.234757
+},
+{
+  Name:       "fPiMinusElast13"
+  Cut:        "elast"
+  Range:      [337.5, 362.5]
+  Nominal:    1.0
+  Sigma:      0.234096
+},
+{
+  Name:       "fPiMinusElast14"
+  Cut:        "elast"
+  Range:      [362.5, 387.5]
+  Nominal:    1.0
+  Sigma:      0.206458
+},
+{
+  Name:       "fPiMinusElast15"
+  Cut:        "elast"
+  Range:      [387.5, 412.5]
+  Nominal:    1.0
+  Sigma:      0.332955
+},
+{
+  Name:       "fPiMinusElast16"
+  Cut:        "elast"
+  Range:      [412.5, 437.5]
+  Nominal:    1.0
+  Sigma:      0.329243
+},
+{
+  Name:       "fPiMinusElast17"
+  Cut:        "elast"
+  Range:      [437.5, 462.5]
+  Nominal:    1.0
+  Sigma:      0.340440
+},
+{
+  Name:       "fPiMinusElast18"
+  Cut:        "elast"
+  Range:      [462.5, 487.5]
+  Nominal:    1.0
+  Sigma:      0.341151
+},
+{
+  Name:       "fPiMinusElast19"
+  Cut:        "elast"
+  Range:      [487.5, 512.5]
+  Nominal:    1.0
+  Sigma:      0.343023
+},
+{
+  Name:       "fPiMinusElast20"
+  Cut:        "elast"
+  Range:      [512.5, 537.5]
+  Nominal:    1.0
+  Sigma:      0.352874
+},
+{
+  Name:       "fPiMinusElast21"
+  Cut:        "elast"
+  Range:      [537.5, 562.5]
+  Nominal:    1.0
+  Sigma:      0.360178
+},
+{
+  Name:       "fPiMinusElast22"
+  Cut:        "elast"
+  Range:      [562.5, 587.5]
+  Nominal:    1.0
+  Sigma:      0.372826
+},
+{
+  Name:       "fPiMinusElast23"
+  Cut:        "elast"
+  Range:      [587.5, 612.5]
+  Nominal:    1.0
+  Sigma:      0.390515
+},
+{
+  Name:       "fPiMinusElast24"
+  Cut:        "elast"
+  Range:      [612.5, 637.5]
+  Nominal:    1.0
+  Sigma:      0.405624
+},
+{
+  Name:       "fPiMinusElast25"
+  Cut:        "elast"
+  Range:      [637.5, 662.5]
+  Nominal:    1.0
+  Sigma:      0.406443
+},
+{
+  Name:       "fPiMinusElast26"
+  Cut:        "elast"
+  Range:      [662.5, 687.5]
+  Nominal:    1.0
+  Sigma:      0.420242
+},
+{
+  Name:       "fPiMinusElast27"
+  Cut:        "elast"
+  Range:      [687.5, 712.5]
+  Nominal:    1.0
+  Sigma:      0.422589
+},
+{
+  Name:       "fPiMinusElast28"
+  Cut:        "elast"
+  Range:      [712.5, 737.5]
+  Nominal:    1.0
+  Sigma:      0.434456
+},
+{
+  Name:       "fPiMinusElast29"
+  Cut:        "elast"
+  Range:      [737.5, 762.5]
+  Nominal:    1.0
+  Sigma:      0.442080
+},
+{
+  Name:       "fPiMinusElast30"
+  Cut:        "elast"
+  Range:      [762.5, 787.5]
+  Nominal:    1.0
+  Sigma:      0.451528
+},
+{
+  Name:       "fPiMinusElast31"
+  Cut:        "elast"
+  Range:      [787.5, 812.5]
+  Nominal:    1.0
+  Sigma:      0.467595
+},
+{
+  Name:       "fPiMinusElast32"
+  Cut:        "elast"
+  Range:      [812.5, 837.5]
+  Nominal:    1.0
+  Sigma:      0.472003
+},
+{
+  Name:       "fPiMinusElast33"
+  Cut:        "elast"
+  Range:      [837.5, 862.5]
+  Nominal:    1.0
+  Sigma:      0.478751
+},
+{
+  Name:       "fPiMinusElast34"
+  Cut:        "elast"
+  Range:      [862.5, 887.5]
+  Nominal:    1.0
+  Sigma:      0.485131
+},
+{
+  Name:       "fPiMinusElast35"
+  Cut:        "elast"
+  Range:      [887.5, 912.5]
+  Nominal:    1.0
+  Sigma:      0.493439
+},
+{
+  Name:       "fPiMinusElast36"
+  Cut:        "elast"
+  Range:      [912.5, 937.5]
+  Nominal:    1.0
+  Sigma:      0.498368
+},
+{
+  Name:       "fPiMinusElast37"
+  Cut:        "elast"
+  Range:      [937.5, 962.5]
+  Nominal:    1.0
+  Sigma:      0.506037
+},
+{
+  Name:       "fPiMinusElast38"
+  Cut:        "elast"
+  Range:      [962.5, 987.5]
+  Nominal:    1.0
+  Sigma:      0.508539
+},
+{
+  Name:       "fPiMinusElast39"
+  Cut:        "elast"
+  Range:      [987.5, 1012.5]
+  Nominal:    1.0
+  Sigma:      0.514985
+},
+{
+  Name:       "fPiMinusCex0"
+  Cut:        "cex"
+  Range:      [12.5, 37.5]
+  Nominal:    1.0
+  Sigma:      1.177848
+},
+{
+  Name:       "fPiMinusCex1"
+  Cut:        "cex"
+  Range:      [37.5, 62.5]
+  Nominal:    1.0
+  Sigma:      0.511476
+},
+{
+  Name:       "fPiMinusCex2"
+  Cut:        "cex"
+  Range:      [62.5, 87.5]
+  Nominal:    1.0
+  Sigma:      0.382695
+},
+{
+  Name:       "fPiMinusCex3"
+  Cut:        "cex"
+  Range:      [87.5, 112.5]
+  Nominal:    1.0
+  Sigma:      0.356070
+},
+{
+  Name:       "fPiMinusCex4"
+  Cut:        "cex"
+  Range:      [112.5, 137.5]
+  Nominal:    1.0
+  Sigma:      0.274173
+},
+{
+  Name:       "fPiMinusCex5"
+  Cut:        "cex"
+  Range:      [137.5, 162.5]
+  Nominal:    1.0
+  Sigma:      0.246727
+},
+{
+  Name:       "fPiMinusCex6"
+  Cut:        "cex"
+  Range:      [162.5, 187.5]
+  Nominal:    1.0
+  Sigma:      0.230513
+},
+{
+  Name:       "fPiMinusCex7"
+  Cut:        "cex"
+  Range:      [187.5, 212.5]
+  Nominal:    1.0
+  Sigma:      0.228870
+},
+{
+  Name:       "fPiMinusCex8"
+  Cut:        "cex"
+  Range:      [212.5, 237.5]
+  Nominal:    1.0
+  Sigma:      0.220288
+},
+{
+  Name:       "fPiMinusCex9"
+  Cut:        "cex"
+  Range:      [237.5, 262.5]
+  Nominal:    1.0
+  Sigma:      0.215899
+},
+{
+  Name:       "fPiMinusCex10"
+  Cut:        "cex"
+  Range:      [262.5, 287.5]
+  Nominal:    1.0
+  Sigma:      0.230833
+},
+{
+  Name:       "fPiMinusCex11"
+  Cut:        "cex"
+  Range:      [287.5, 312.5]
+  Nominal:    1.0
+  Sigma:      0.229074
+},
+{
+  Name:       "fPiMinusCex12"
+  Cut:        "cex"
+  Range:      [312.5, 337.5]
+  Nominal:    1.0
+  Sigma:      0.247054
+},
+{
+  Name:       "fPiMinusCex13"
+  Cut:        "cex"
+  Range:      [337.5, 362.5]
+  Nominal:    1.0
+  Sigma:      0.235299
+},
+{
+  Name:       "fPiMinusCex14"
+  Cut:        "cex"
+  Range:      [362.5, 387.5]
+  Nominal:    1.0
+  Sigma:      0.249922
+},
+{
+  Name:       "fPiMinusCex15"
+  Cut:        "cex"
+  Range:      [387.5, 412.5]
+  Nominal:    1.0
+  Sigma:      0.255700
+},
+{
+  Name:       "fPiMinusCex16"
+  Cut:        "cex"
+  Range:      [412.5, 437.5]
+  Nominal:    1.0
+  Sigma:      0.263993
+},
+{
+  Name:       "fPiMinusCex17"
+  Cut:        "cex"
+  Range:      [437.5, 462.5]
+  Nominal:    1.0
+  Sigma:      0.268959
+},
+{
+  Name:       "fPiMinusCex18"
+  Cut:        "cex"
+  Range:      [462.5, 487.5]
+  Nominal:    1.0
+  Sigma:      0.288429
+},
+{
+  Name:       "fPiMinusCex19"
+  Cut:        "cex"
+  Range:      [487.5, 512.5]
+  Nominal:    1.0
+  Sigma:      0.305926
+},
+{
+  Name:       "fPiMinusCex20"
+  Cut:        "cex"
+  Range:      [512.5, 537.5]
+  Nominal:    1.0
+  Sigma:      0.307906
+},
+{
+  Name:       "fPiMinusCex21"
+  Cut:        "cex"
+  Range:      [537.5, 562.5]
+  Nominal:    1.0
+  Sigma:      0.315934
+},
+{
+  Name:       "fPiMinusCex22"
+  Cut:        "cex"
+  Range:      [562.5, 587.5]
+  Nominal:    1.0
+  Sigma:      0.313417
+},
+{
+  Name:       "fPiMinusCex23"
+  Cut:        "cex"
+  Range:      [587.5, 612.5]
+  Nominal:    1.0
+  Sigma:      0.303154
+},
+{
+  Name:       "fPiMinusCex24"
+  Cut:        "cex"
+  Range:      [612.5, 637.5]
+  Nominal:    1.0
+  Sigma:      0.304680
+},
+{
+  Name:       "fPiMinusCex25"
+  Cut:        "cex"
+  Range:      [637.5, 662.5]
+  Nominal:    1.0
+  Sigma:      0.318044
+},
+{
+  Name:       "fPiMinusCex26"
+  Cut:        "cex"
+  Range:      [662.5, 687.5]
+  Nominal:    1.0
+  Sigma:      0.340765
+},
+{
+  Name:       "fPiMinusCex27"
+  Cut:        "cex"
+  Range:      [687.5, 712.5]
+  Nominal:    1.0
+  Sigma:      0.358182
+},
+{
+  Name:       "fPiMinusCex28"
+  Cut:        "cex"
+  Range:      [712.5, 737.5]
+  Nominal:    1.0
+  Sigma:      0.357202
+},
+{
+  Name:       "fPiMinusCex29"
+  Cut:        "cex"
+  Range:      [737.5, 762.5]
+  Nominal:    1.0
+  Sigma:      0.367031
+},
+{
+  Name:       "fPiMinusCex30"
+  Cut:        "cex"
+  Range:      [762.5, 787.5]
+  Nominal:    1.0
+  Sigma:      0.361988
+},
+{
+  Name:       "fPiMinusCex31"
+  Cut:        "cex"
+  Range:      [787.5, 812.5]
+  Nominal:    1.0
+  Sigma:      0.363707
+},
+{
+  Name:       "fPiMinusCex32"
+  Cut:        "cex"
+  Range:      [812.5, 837.5]
+  Nominal:    1.0
+  Sigma:      0.356352
+},
+{
+  Name:       "fPiMinusCex33"
+  Cut:        "cex"
+  Range:      [837.5, 862.5]
+  Nominal:    1.0
+  Sigma:      0.363710
+},
+{
+  Name:       "fPiMinusCex34"
+  Cut:        "cex"
+  Range:      [862.5, 887.5]
+  Nominal:    1.0
+  Sigma:      0.346532
+},
+{
+  Name:       "fPiMinusCex35"
+  Cut:        "cex"
+  Range:      [887.5, 912.5]
+  Nominal:    1.0
+  Sigma:      0.332314
+},
+{
+  Name:       "fPiMinusCex36"
+  Cut:        "cex"
+  Range:      [912.5, 937.5]
+  Nominal:    1.0
+  Sigma:      0.332213
+},
+{
+  Name:       "fPiMinusCex37"
+  Cut:        "cex"
+  Range:      [937.5, 962.5]
+  Nominal:    1.0
+  Sigma:      0.328969
+},
+{
+  Name:       "fPiMinusCex38"
+  Cut:        "cex"
+  Range:      [962.5, 987.5]
+  Nominal:    1.0
+  Sigma:      0.334047
+},
+{
+  Name:       "fPiMinusCex39"
+  Cut:        "cex"
+  Range:      [987.5, 1012.5]
+  Nominal:    1.0
+  Sigma:      0.319872
+},
+{
+  Name:       "fPiMinusDCex0"
+  Cut:        "dcex"
+  Range:      [12.5, 37.5]
+  Nominal:    1.0
+  Sigma:      0.636656
+},
+{
+  Name:       "fPiMinusDCex1"
+  Cut:        "dcex"
+  Range:      [37.5, 62.5]
+  Nominal:    1.0
+  Sigma:      1.060340
+},
+{
+  Name:       "fPiMinusDCex2"
+  Cut:        "dcex"
+  Range:      [62.5, 87.5]
+  Nominal:    1.0
+  Sigma:      1.166155
+},
+{
+  Name:       "fPiMinusDCex3"
+  Cut:        "dcex"
+  Range:      [87.5, 112.5]
+  Nominal:    1.0
+  Sigma:      0.990921
+},
+{
+  Name:       "fPiMinusDCex4"
+  Cut:        "dcex"
+  Range:      [112.5, 137.5]
+  Nominal:    1.0
+  Sigma:      0.933172
+},
+{
+  Name:       "fPiMinusDCex5"
+  Cut:        "dcex"
+  Range:      [137.5, 162.5]
+  Nominal:    1.0
+  Sigma:      0.754860
+},
+{
+  Name:       "fPiMinusDCex6"
+  Cut:        "dcex"
+  Range:      [162.5, 187.5]
+  Nominal:    1.0
+  Sigma:      0.558739
+},
+{
+  Name:       "fPiMinusDCex7"
+  Cut:        "dcex"
+  Range:      [187.5, 212.5]
+  Nominal:    1.0
+  Sigma:      0.434613
+},
+{
+  Name:       "fPiMinusDCex8"
+  Cut:        "dcex"
+  Range:      [212.5, 237.5]
+  Nominal:    1.0
+  Sigma:      0.386708
+},
+{
+  Name:       "fPiMinusDCex9"
+  Cut:        "dcex"
+  Range:      [237.5, 262.5]
+  Nominal:    1.0
+  Sigma:      0.358643
+},
+{
+  Name:       "fPiMinusDCex10"
+  Cut:        "dcex"
+  Range:      [262.5, 287.5]
+  Nominal:    1.0
+  Sigma:      0.345346
+},
+{
+  Name:       "fPiMinusDCex11"
+  Cut:        "dcex"
+  Range:      [287.5, 312.5]
+  Nominal:    1.0
+  Sigma:      0.301250
+},
+{
+  Name:       "fPiMinusDCex12"
+  Cut:        "dcex"
+  Range:      [312.5, 337.5]
+  Nominal:    1.0
+  Sigma:      0.264154
+},
+{
+  Name:       "fPiMinusDCex13"
+  Cut:        "dcex"
+  Range:      [337.5, 362.5]
+  Nominal:    1.0
+  Sigma:      0.279228
+},
+{
+  Name:       "fPiMinusDCex14"
+  Cut:        "dcex"
+  Range:      [362.5, 387.5]
+  Nominal:    1.0
+  Sigma:      0.224845
+},
+{
+  Name:       "fPiMinusDCex15"
+  Cut:        "dcex"
+  Range:      [387.5, 412.5]
+  Nominal:    1.0
+  Sigma:      0.212392
+},
+{
+  Name:       "fPiMinusDCex16"
+  Cut:        "dcex"
+  Range:      [412.5, 437.5]
+  Nominal:    1.0
+  Sigma:      0.255968
+},
+{
+  Name:       "fPiMinusDCex17"
+  Cut:        "dcex"
+  Range:      [437.5, 462.5]
+  Nominal:    1.0
+  Sigma:      0.224267
+},
+{
+  Name:       "fPiMinusDCex18"
+  Cut:        "dcex"
+  Range:      [462.5, 487.5]
+  Nominal:    1.0
+  Sigma:      0.201638
+},
+{
+  Name:       "fPiMinusDCex19"
+  Cut:        "dcex"
+  Range:      [487.5, 512.5]
+  Nominal:    1.0
+  Sigma:      0.192185
+},
+{
+  Name:       "fPiMinusDCex20"
+  Cut:        "dcex"
+  Range:      [512.5, 537.5]
+  Nominal:    1.0
+  Sigma:      0.162549
+},
+{
+  Name:       "fPiMinusDCex21"
+  Cut:        "dcex"
+  Range:      [537.5, 562.5]
+  Nominal:    1.0
+  Sigma:      0.134557
+},
+{
+  Name:       "fPiMinusDCex22"
+  Cut:        "dcex"
+  Range:      [562.5, 587.5]
+  Nominal:    1.0
+  Sigma:      0.102942
+},
+{
+  Name:       "fPiMinusDCex23"
+  Cut:        "dcex"
+  Range:      [587.5, 612.5]
+  Nominal:    1.0
+  Sigma:      0.077014
+},
+{
+  Name:       "fPiMinusDCex24"
+  Cut:        "dcex"
+  Range:      [612.5, 637.5]
+  Nominal:    1.0
+  Sigma:      0.052790
+},
+{
+  Name:       "fPiMinusDCex25"
+  Cut:        "dcex"
+  Range:      [637.5, 662.5]
+  Nominal:    1.0
+  Sigma:      0.052955
+},
+{
+  Name:       "fPiMinusDCex26"
+  Cut:        "dcex"
+  Range:      [662.5, 687.5]
+  Nominal:    1.0
+  Sigma:      0.076444
+},
+{
+  Name:       "fPiMinusDCex27"
+  Cut:        "dcex"
+  Range:      [687.5, 712.5]
+  Nominal:    1.0
+  Sigma:      0.027106
+},
+{
+  Name:       "fPiMinusDCex28"
+  Cut:        "dcex"
+  Range:      [712.5, 737.5]
+  Nominal:    1.0
+  Sigma:      0.019763
+},
+{
+  Name:       "fPiMinusDCex29"
+  Cut:        "dcex"
+  Range:      [737.5, 762.5]
+  Nominal:    1.0
+  Sigma:      0.028278
+},
+{
+  Name:       "fPiMinusDCex30"
+  Cut:        "dcex"
+  Range:      [762.5, 787.5]
+  Nominal:    1.0
+  Sigma:      0.033712
+},
+{
+  Name:       "fPiMinusDCex31"
+  Cut:        "dcex"
+  Range:      [787.5, 812.5]
+  Nominal:    1.0
+  Sigma:      0.078114
+},
+{
+  Name:       "fPiMinusDCex32"
+  Cut:        "dcex"
+  Range:      [812.5, 837.5]
+  Nominal:    1.0
+  Sigma:      0.083494
+},
+{
+  Name:       "fPiMinusDCex33"
+  Cut:        "dcex"
+  Range:      [837.5, 862.5]
+  Nominal:    1.0
+  Sigma:      0.081311
+},
+{
+  Name:       "fPiMinusDCex34"
+  Cut:        "dcex"
+  Range:      [862.5, 887.5]
+  Nominal:    1.0
+  Sigma:      0.109030
+},
+{
+  Name:       "fPiMinusDCex35"
+  Cut:        "dcex"
+  Range:      [887.5, 912.5]
+  Nominal:    1.0
+  Sigma:      0.081517
+},
+{
+  Name:       "fPiMinusDCex36"
+  Cut:        "dcex"
+  Range:      [912.5, 937.5]
+  Nominal:    1.0
+  Sigma:      0.117683
+},
+{
+  Name:       "fPiMinusDCex37"
+  Cut:        "dcex"
+  Range:      [937.5, 962.5]
+  Nominal:    1.0
+  Sigma:      0.101247
+},
+{
+  Name:       "fPiMinusDCex38"
+  Cut:        "dcex"
+  Range:      [962.5, 987.5]
+  Nominal:    1.0
+  Sigma:      0.113007
+},
+{
+  Name:       "fPiMinusDCex39"
+  Cut:        "dcex"
+  Range:      [987.5, 1012.5]
+  Nominal:    1.0
+  Sigma:      0.092736
+},
+{
+  Name:       "fPiMinusPiProd0"
+  Cut:        "prod"
+  Range:      [12.5, 37.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd1"
+  Cut:        "prod"
+  Range:      [37.5, 62.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd2"
+  Cut:        "prod"
+  Range:      [62.5, 87.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd3"
+  Cut:        "prod"
+  Range:      [87.5, 112.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd4"
+  Cut:        "prod"
+  Range:      [112.5, 137.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd5"
+  Cut:        "prod"
+  Range:      [137.5, 162.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd6"
+  Cut:        "prod"
+  Range:      [162.5, 187.5]
+  Nominal:    1.0
+  Sigma:      0.000000
+},
+{
+  Name:       "fPiMinusPiProd7"
+  Cut:        "prod"
+  Range:      [187.5, 212.5]
+  Nominal:    1.0
+  Sigma:      1.501047
+},
+{
+  Name:       "fPiMinusPiProd8"
+  Cut:        "prod"
+  Range:      [212.5, 237.5]
+  Nominal:    1.0
+  Sigma:      1.533008
+},
+{
+  Name:       "fPiMinusPiProd9"
+  Cut:        "prod"
+  Range:      [237.5, 262.5]
+  Nominal:    1.0
+  Sigma:      1.360815
+},
+{
+  Name:       "fPiMinusPiProd10"
+  Cut:        "prod"
+  Range:      [262.5, 287.5]
+  Nominal:    1.0
+  Sigma:      1.067549
+},
+{
+  Name:       "fPiMinusPiProd11"
+  Cut:        "prod"
+  Range:      [287.5, 312.5]
+  Nominal:    1.0
+  Sigma:      1.025189
+},
+{
+  Name:       "fPiMinusPiProd12"
+  Cut:        "prod"
+  Range:      [312.5, 337.5]
+  Nominal:    1.0
+  Sigma:      0.871914
+},
+{
+  Name:       "fPiMinusPiProd13"
+  Cut:        "prod"
+  Range:      [337.5, 362.5]
+  Nominal:    1.0
+  Sigma:      0.843729
+},
+{
+  Name:       "fPiMinusPiProd14"
+  Cut:        "prod"
+  Range:      [362.5, 387.5]
+  Nominal:    1.0
+  Sigma:      0.364665
+},
+{
+  Name:       "fPiMinusPiProd15"
+  Cut:        "prod"
+  Range:      [387.5, 412.5]
+  Nominal:    1.0
+  Sigma:      0.382529
+},
+{
+  Name:       "fPiMinusPiProd16"
+  Cut:        "prod"
+  Range:      [412.5, 437.5]
+  Nominal:    1.0
+  Sigma:      0.369796
+},
+{
+  Name:       "fPiMinusPiProd17"
+  Cut:        "prod"
+  Range:      [437.5, 462.5]
+  Nominal:    1.0
+  Sigma:      0.354809
+},
+{
+  Name:       "fPiMinusPiProd18"
+  Cut:        "prod"
+  Range:      [462.5, 487.5]
+  Nominal:    1.0
+  Sigma:      0.343182
+},
+{
+  Name:       "fPiMinusPiProd19"
+  Cut:        "prod"
+  Range:      [487.5, 512.5]
+  Nominal:    1.0
+  Sigma:      0.353054
+},
+{
+  Name:       "fPiMinusPiProd20"
+  Cut:        "prod"
+  Range:      [512.5, 537.5]
+  Nominal:    1.0
+  Sigma:      0.326300
+},
+{
+  Name:       "fPiMinusPiProd21"
+  Cut:        "prod"
+  Range:      [537.5, 562.5]
+  Nominal:    1.0
+  Sigma:      0.308690
+},
+{
+  Name:       "fPiMinusPiProd22"
+  Cut:        "prod"
+  Range:      [562.5, 587.5]
+  Nominal:    1.0
+  Sigma:      0.325799
+},
+{
+  Name:       "fPiMinusPiProd23"
+  Cut:        "prod"
+  Range:      [587.5, 612.5]
+  Nominal:    1.0
+  Sigma:      0.326711
+},
+{
+  Name:       "fPiMinusPiProd24"
+  Cut:        "prod"
+  Range:      [612.5, 637.5]
+  Nominal:    1.0
+  Sigma:      0.305347
+},
+{
+  Name:       "fPiMinusPiProd25"
+  Cut:        "prod"
+  Range:      [637.5, 662.5]
+  Nominal:    1.0
+  Sigma:      0.311222
+},
+{
+  Name:       "fPiMinusPiProd26"
+  Cut:        "prod"
+  Range:      [662.5, 687.5]
+  Nominal:    1.0
+  Sigma:      0.298303
+},
+{
+  Name:       "fPiMinusPiProd27"
+  Cut:        "prod"
+  Range:      [687.5, 712.5]
+  Nominal:    1.0
+  Sigma:      0.290193
+},
+{
+  Name:       "fPiMinusPiProd28"
+  Cut:        "prod"
+  Range:      [712.5, 737.5]
+  Nominal:    1.0
+  Sigma:      0.268158
+},
+{
+  Name:       "fPiMinusPiProd29"
+  Cut:        "prod"
+  Range:      [737.5, 762.5]
+  Nominal:    1.0
+  Sigma:      0.246895
+},
+{
+  Name:       "fPiMinusPiProd30"
+  Cut:        "prod"
+  Range:      [762.5, 787.5]
+  Nominal:    1.0
+  Sigma:      0.227497
+},
+{
+  Name:       "fPiMinusPiProd31"
+  Cut:        "prod"
+  Range:      [787.5, 812.5]
+  Nominal:    1.0
+  Sigma:      0.216528
+},
+{
+  Name:       "fPiMinusPiProd32"
+  Cut:        "prod"
+  Range:      [812.5, 837.5]
+  Nominal:    1.0
+  Sigma:      0.207495
+},
+{
+  Name:       "fPiMinusPiProd33"
+  Cut:        "prod"
+  Range:      [837.5, 862.5]
+  Nominal:    1.0
+  Sigma:      0.195020
+},
+{
+  Name:       "fPiMinusPiProd34"
+  Cut:        "prod"
+  Range:      [862.5, 887.5]
+  Nominal:    1.0
+  Sigma:      0.192194
+},
+{
+  Name:       "fPiMinusPiProd35"
+  Cut:        "prod"
+  Range:      [887.5, 912.5]
+  Nominal:    1.0
+  Sigma:      0.191527
+},
+{
+  Name:       "fPiMinusPiProd36"
+  Cut:        "prod"
+  Range:      [912.5, 937.5]
+  Nominal:    1.0
+  Sigma:      0.197782
+},
+{
+  Name:       "fPiMinusPiProd37"
+  Cut:        "prod"
+  Range:      [937.5, 962.5]
+  Nominal:    1.0
+  Sigma:      0.203483
+},
+{
+  Name:       "fPiMinusPiProd38"
+  Cut:        "prod"
+  Range:      [962.5, 987.5]
+  Nominal:    1.0
+  Sigma:      0.213714
+},
+{
+  Name:       "fPiMinusPiProd39"
+  Cut:        "prod"
+  Range:      [987.5, 1012.5]
+  Nominal:    1.0
+  Sigma:      0.217991
+},
+{
+  Name:       "fPiMinusAbs0"
+  Cut:        "abs"
+  Range:      [12.5, 37.5]
+  Nominal:    1.0
+  Sigma:      0.173107
+},
+{
+  Name:       "fPiMinusAbs1"
+  Cut:        "abs"
+  Range:      [37.5, 62.5]
+  Nominal:    1.0
+  Sigma:      0.225495
+},
+{
+  Name:       "fPiMinusAbs2"
+  Cut:        "abs"
+  Range:      [62.5, 87.5]
+  Nominal:    1.0
+  Sigma:      0.258526
+},
+{
+  Name:       "fPiMinusAbs3"
+  Cut:        "abs"
+  Range:      [87.5, 112.5]
+  Nominal:    1.0
+  Sigma:      0.348221
+},
+{
+  Name:       "fPiMinusAbs4"
+  Cut:        "abs"
+  Range:      [112.5, 137.5]
+  Nominal:    1.0
+  Sigma:      0.317235
+},
+{
+  Name:       "fPiMinusAbs5"
+  Cut:        "abs"
+  Range:      [137.5, 162.5]
+  Nominal:    1.0
+  Sigma:      0.292570
+},
+{
+  Name:       "fPiMinusAbs6"
+  Cut:        "abs"
+  Range:      [162.5, 187.5]
+  Nominal:    1.0
+  Sigma:      0.273824
+},
+{
+  Name:       "fPiMinusAbs7"
+  Cut:        "abs"
+  Range:      [187.5, 212.5]
+  Nominal:    1.0
+  Sigma:      0.246485
+},
+{
+  Name:       "fPiMinusAbs8"
+  Cut:        "abs"
+  Range:      [212.5, 237.5]
+  Nominal:    1.0
+  Sigma:      0.228096
+},
+{
+  Name:       "fPiMinusAbs9"
+  Cut:        "abs"
+  Range:      [237.5, 262.5]
+  Nominal:    1.0
+  Sigma:      0.211947
+},
+{
+  Name:       "fPiMinusAbs10"
+  Cut:        "abs"
+  Range:      [262.5, 287.5]
+  Nominal:    1.0
+  Sigma:      0.199488
+},
+{
+  Name:       "fPiMinusAbs11"
+  Cut:        "abs"
+  Range:      [287.5, 312.5]
+  Nominal:    1.0
+  Sigma:      0.192032
+},
+{
+  Name:       "fPiMinusAbs12"
+  Cut:        "abs"
+  Range:      [312.5, 337.5]
+  Nominal:    1.0
+  Sigma:      0.188812
+},
+{
+  Name:       "fPiMinusAbs13"
+  Cut:        "abs"
+  Range:      [337.5, 362.5]
+  Nominal:    1.0
+  Sigma:      0.153740
+},
+{
+  Name:       "fPiMinusAbs14"
+  Cut:        "abs"
+  Range:      [362.5, 387.5]
+  Nominal:    1.0
+  Sigma:      0.198227
+},
+{
+  Name:       "fPiMinusAbs15"
+  Cut:        "abs"
+  Range:      [387.5, 412.5]
+  Nominal:    1.0
+  Sigma:      0.228379
+},
+{
+  Name:       "fPiMinusAbs16"
+  Cut:        "abs"
+  Range:      [412.5, 437.5]
+  Nominal:    1.0
+  Sigma:      0.240838
+},
+{
+  Name:       "fPiMinusAbs17"
+  Cut:        "abs"
+  Range:      [437.5, 462.5]
+  Nominal:    1.0
+  Sigma:      0.250084
+},
+{
+  Name:       "fPiMinusAbs18"
+  Cut:        "abs"
+  Range:      [462.5, 487.5]
+  Nominal:    1.0
+  Sigma:      0.266167
+},
+{
+  Name:       "fPiMinusAbs19"
+  Cut:        "abs"
+  Range:      [487.5, 512.5]
+  Nominal:    1.0
+  Sigma:      0.289900
+},
+{
+  Name:       "fPiMinusAbs20"
+  Cut:        "abs"
+  Range:      [512.5, 537.5]
+  Nominal:    1.0
+  Sigma:      0.301126
+},
+{
+  Name:       "fPiMinusAbs21"
+  Cut:        "abs"
+  Range:      [537.5, 562.5]
+  Nominal:    1.0
+  Sigma:      0.331657
+},
+{
+  Name:       "fPiMinusAbs22"
+  Cut:        "abs"
+  Range:      [562.5, 587.5]
+  Nominal:    1.0
+  Sigma:      0.356798
+},
+{
+  Name:       "fPiMinusAbs23"
+  Cut:        "abs"
+  Range:      [587.5, 612.5]
+  Nominal:    1.0
+  Sigma:      0.370747
+},
+{
+  Name:       "fPiMinusAbs24"
+  Cut:        "abs"
+  Range:      [612.5, 637.5]
+  Nominal:    1.0
+  Sigma:      0.360727
+},
+{
+  Name:       "fPiMinusAbs25"
+  Cut:        "abs"
+  Range:      [637.5, 662.5]
+  Nominal:    1.0
+  Sigma:      0.350038
+},
+{
+  Name:       "fPiMinusAbs26"
+  Cut:        "abs"
+  Range:      [662.5, 687.5]
+  Nominal:    1.0
+  Sigma:      0.340103
+},
+{
+  Name:       "fPiMinusAbs27"
+  Cut:        "abs"
+  Range:      [687.5, 712.5]
+  Nominal:    1.0
+  Sigma:      0.321625
+},
+{
+  Name:       "fPiMinusAbs28"
+  Cut:        "abs"
+  Range:      [712.5, 737.5]
+  Nominal:    1.0
+  Sigma:      0.325298
+},
+{
+  Name:       "fPiMinusAbs29"
+  Cut:        "abs"
+  Range:      [737.5, 762.5]
+  Nominal:    1.0
+  Sigma:      0.333677
+},
+{
+  Name:       "fPiMinusAbs30"
+  Cut:        "abs"
+  Range:      [762.5, 787.5]
+  Nominal:    1.0
+  Sigma:      0.336717
+},
+{
+  Name:       "fPiMinusAbs31"
+  Cut:        "abs"
+  Range:      [787.5, 812.5]
+  Nominal:    1.0
+  Sigma:      0.356770
+},
+{
+  Name:       "fPiMinusAbs32"
+  Cut:        "abs"
+  Range:      [812.5, 837.5]
+  Nominal:    1.0
+  Sigma:      0.369455
+},
+{
+  Name:       "fPiMinusAbs33"
+  Cut:        "abs"
+  Range:      [837.5, 862.5]
+  Nominal:    1.0
+  Sigma:      0.384156
+},
+{
+  Name:       "fPiMinusAbs34"
+  Cut:        "abs"
+  Range:      [862.5, 887.5]
+  Nominal:    1.0
+  Sigma:      0.387228
+},
+{
+  Name:       "fPiMinusAbs35"
+  Cut:        "abs"
+  Range:      [887.5, 912.5]
+  Nominal:    1.0
+  Sigma:      0.403370
+},
+{
+  Name:       "fPiMinusAbs36"
+  Cut:        "abs"
+  Range:      [912.5, 937.5]
+  Nominal:    1.0
+  Sigma:      0.412111
+},
+{
+  Name:       "fPiMinusAbs37"
+  Cut:        "abs"
+  Range:      [937.5, 962.5]
+  Nominal:    1.0
+  Sigma:      0.416860
+},
+{
+  Name:       "fPiMinusAbs38"
+  Cut:        "abs"
+  Range:      [962.5, 987.5]
+  Nominal:    1.0
+  Sigma:      0.424378
+},
+{
+  Name:       "fPiMinusAbs39"
+  Cut:        "abs"
+  Range:      [987.5, 1012.5]
+  Nominal:    1.0
+  Sigma:      0.451586
+}
+]
+
+END_PROLOG
