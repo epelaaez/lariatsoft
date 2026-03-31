@@ -366,6 +366,13 @@ class RecoNNAllEval : public art::EDAnalyzer {
         std::vector<double>      wcMatchYPos;
         std::vector<double>      wcMatchZPos;
 
+        // WC quality checks
+        int wcNumHits;
+        std::vector<double> wcHit0;
+        std::vector<double> wcHit1;
+        std::vector<double> wcHit2;
+        std::vector<double> wcHit3;
+
         // True incident KE information
         bool                validTrueIncidentKE;
         std::vector<double> trueIncidentKEContributions;
@@ -1412,6 +1419,16 @@ void RecoNNAllEval::analyze(art::Event const &e) {
     if (bVerbose) std::cout << "WCTrackMomentum: " << WCTrackMomentum << std::endl;
     if (bVerbose) std::cout << std::endl;
 
+    ////////////////////////////////
+    // Data for WC qualtiy filter //
+    ////////////////////////////////
+
+    wcNumHits = wctrack[0]->NHits();
+    wcHit0    = {wctrack[0]->HitPosition(0, 0), wctrack[0]->HitPosition(0, 1), wctrack[0]->HitPosition(0, 2)};
+    wcHit1    = {wctrack[0]->HitPosition(1, 0), wctrack[0]->HitPosition(1, 1), wctrack[0]->HitPosition(1, 2)};
+    wcHit2    = {wctrack[0]->HitPosition(2, 0), wctrack[0]->HitPosition(2, 1), wctrack[0]->HitPosition(2, 2)};
+    wcHit3    = {wctrack[0]->HitPosition(3, 0), wctrack[0]->HitPosition(3, 1), wctrack[0]->HitPosition(3, 2)};
+
     ////////////////
     // TPC tracks //
     ////////////////
@@ -2030,16 +2047,6 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("numVisibleProtons", &numVisibleProtons, "numVisibleProtons/I");
     RecoNNAllEvalTree->Branch("backgroundType", &backgroundType, "backgroundType/I");
 
-    // RecoNNAllEvalTree->Branch("trackProb", &trackProb, "trackProb/D");
-    // RecoNNAllEvalTree->Branch("showerProb", &showerProb, "showerProb/D");
-    // RecoNNAllEvalTree->Branch("obtainedProbabilities", &obtainedProbabilities, "obtainedProbabilities/O");
-
-    // RecoNNAllEvalTree->Branch("showerNoBoxProb", &showerNoBoxProb, "showerNoBoxProb/D");
-    // RecoNNAllEvalTree->Branch("obtainedNoBoxProbabilities", &obtainedNoBoxProbabilities, "obtainedNoBoxProbabilities/O");
-
-    // RecoNNAllEvalTree->Branch("showerOutsideBoxProb", &showerOutsideBoxProb, "showerOutsideBoxProb/D");
-    // RecoNNAllEvalTree->Branch("obtainedOutsideBoxProbabilities", &obtainedOutsideBoxProbabilities, "obtainedOutsideBoxProbabilities/O");
-
     RecoNNAllEvalTree->Branch("truthPrimaryPDG", &truthPrimaryPDG, "truthPrimaryPDG/I");
     RecoNNAllEvalTree->Branch("truthPrimaryID", &truthPrimaryID, "truthPrimaryID/I");
     RecoNNAllEvalTree->Branch("truthPrimaryIncidentKE", &truthPrimaryIncidentKE, "truthPrimaryIncidentKE/D");
@@ -2234,6 +2241,12 @@ void RecoNNAllEval::beginJob() {
     RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersPDG", "std::vector<std::vector<int>>", &secondaryInteractionDaughtersPDG);
     RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersKE", "std::vector<std::vector<double>>", &secondaryInteractionDaughtersKE);
     // RecoNNAllEvalTree->Branch("secondaryInteractionDaughtersProcess", "std::vector<std::vector<std::string>>", &secondaryInteractionDaughtersProcess); // not saving for some reason
+
+    RecoNNAllEvalTree->Branch("wcNumHits", &wcNumHits, "wcNumHits/I");
+    RecoNNAllEvalTree->Branch("wcHit0", "std::vector<double>", &wcHit0);
+    RecoNNAllEvalTree->Branch("wcHit1", "std::vector<double>", &wcHit1);
+    RecoNNAllEvalTree->Branch("wcHit2", "std::vector<double>", &wcHit2);
+    RecoNNAllEvalTree->Branch("wcHit3", "std::vector<double>", &wcHit3);
 }
 
 unsigned int RecoNNAllEval::lastPointInTPC(simb::MCParticle *track) {
@@ -2838,6 +2851,12 @@ void RecoNNAllEval::resetTree() {
     secondaryInteractionDaughtersPDG.clear();
     secondaryInteractionDaughtersKE.clear();
     secondaryInteractionDaughtersProcess.clear();
+
+    wcNumHits = -1.;
+    wcHit0.clear();
+    wcHit1.clear();
+    wcHit2.clear();
+    wcHit3.clear();
 }
 
 void RecoNNAllEval::endJob() {
