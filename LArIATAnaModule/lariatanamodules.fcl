@@ -25,15 +25,15 @@ lariat_anatree:
     CalorimetryAlg:           @local::lariat_calorimetryalgdata
     BeamlineMassAlg:          @local::lariat_beamlinemassalg
     SaveBeamlineInfo:         true
-    SaveWireChamberHits:        false
+    SaveWireChamberHits:      true
     SaveGeantInfo:            true
-    SaveGeantTrajectories:      false
-    SaveMCShowerInfo:           false 
-    SaveAerogelInfo:            false
+    SaveGeantTrajectories:    true
+    SaveMCShowerInfo:         false 
+    SaveAerogelInfo:          false
     SaveSimChannelInfo:       true
     SaveTrackCalorimetry:     true
-    SaveTrack3DSpacePoints:     false
-    SaveTrackTrajectories:      false
+    SaveTrack3DSpacePoints:   false
+    SaveTrackTrajectories:    true
     SelectBeamlineMassRange:  [ -9, -9 ] # Only save events with beamline mass in this range
 }
 
@@ -59,15 +59,15 @@ lariat_anatree:
     CalorimetryAlg:           @local::lariat_calorimetryalgdata
     BeamlineMassAlg:          @local::lariat_beamlinemassalg
     SaveBeamlineInfo:         true
-    SaveWireChamberHits:        false
+    SaveWireChamberHits:      true
     SaveGeantInfo:            true
-    SaveGeantTrajectories:      false
-    SaveMCShowerInfo:           false 
-    SaveAerogelInfo:            false
+    SaveGeantTrajectories:    true
+    SaveMCShowerInfo:         false 
+    SaveAerogelInfo:          false
     SaveSimChannelInfo:       true
     SaveTrackCalorimetry:     true
-    SaveTrack3DSpacePoints:     false
-    SaveTrackTrajectories:      false
+    SaveTrack3DSpacePoints:   false
+    SaveTrackTrajectories:    true
     SelectBeamlineMassRange:  [ -9, -9 ] # Only save events with beamline mass in this range
 }
 

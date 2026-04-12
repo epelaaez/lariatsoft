@@ -953,10 +953,22 @@ void lariat::AnaTreeT1034::analyze(art::Event const & evt)
             //float dE_end = E_end - traj.E(last-1);
             //if( KE_end <= 0.0001 && fabs(dE_end) > 0.010 ) EndEng[i] = traj.E(last-1);
             EndEng[i] = traj.E(last-1);
+            EndPx[i]  = traj.Px(last-1);
+            EndPy[i]  = traj.Py(last-1);
+            EndPz[i]  = traj.Pz(last-1);
          }
           
 	 // ### Save intermediary information for the primary track
 	 if(geant_part[i]->Process()==pri){
+
+      // std::cout << "event " << event << std::endl;
+      // std::cout << "num primaries: " << no_primaries << std::endl;
+      // std::cout << "primary pdg: " << pdg[i] << std::endl;
+      // std::cout << "geant4 list size: " << geant_list_size << std::endl;
+      // std::cout << "foudn primary with " << geant_part[i]->NumberTrajectoryPoints() << std::endl;
+      // std::cout << "primary id " << geant_part[i]->TrackId() << std::endl;
+      // std::cout << "number of daughters " << NumberDaughters[i] << std::endl;
+
 	  NTrTrajPts[i]=geant_part[i]->NumberTrajectoryPoints();
 	  simb::MCTrajectory truetraj = geant_part[i]->Trajectory();
 
