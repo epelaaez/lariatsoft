@@ -29,21 +29,21 @@ PiMinusParameters: [
     Cut:        "cex"
     Range:      [10.0, 2005.00]
     Nominal:    1.0
-    Sigma:      0.25
+    Sigma:      0.2
   },
   {
     Name:       "fPiMinusDCex"
     Cut:        "dcex"
     Range:      [10.0, 2005.00]
     Nominal:    1.0
-    Sigma:      0.25
+    Sigma:      0.2
   },
   {
     Name:       "fPiMinusPiProd"
     Cut:        "prod"
     Range:      [10.0, 2005.00]
     Nominal:    1.0
-    Sigma:      0.25
+    Sigma:      0.2
   } 
 ]
 
